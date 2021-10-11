@@ -1,0 +1,45 @@
+= tx_engine (Rust Coding Test)
+
+Simple toy payments engine that reads a series of transactions from a CSV, updates client accounts, handles disputes and chargebacks, and then outputs the state of clients accounts as a CSV.
+
+== Goals
+
+My primary goal was to focus on *completness* and *correctness*. Therefore I tested tricky cases like:
+
+- double chargeback of the same transaction
+- dispute of transactions different than deposit
+- malicious data, e.g. wrong client/amount passed in dispute
+- deposit/chargeback after locking account
+
+Some of the tests are placed under _./assets_ directory in this repository.
+
+== My assumptions
+
+Task is not clear about what happens when account is locked and what transaction should be accepted since that event. We also do not know if only deposit can be disputed, or maybe withdrawal too?. Should we allow dispute if user has not enough money? A lot of things is unclear...
+
+I know that task states:
+____
+When in doubt on how to interpret a requirement, try to make assumptions that make sense for a bank.
+____
+
+However it is *not fair* and contradicts with:
+____
+If our automatic test suite passes, manual scoring will beused for everything else.
+____
+
+But I decided to make following assumptions:
+
+- Malformed data is not improved/corrected, but simply rejected. *Example:* dispute/resolve/chargeback transaction with wrong client ID, or containing amount field
+- After account is locked we disallow deposit and withdrawal, but we still allow to make dispute or process resolve/chargeback.
+- We allow to make dispute even if user has not enough money available. As a results you will observe negative balances.
+
+== Safety
+
+I did *not* use unsafe code and panic should not happen at all. Other errors are handled in following way:
+
+- general args / file/stdout errors - message is printed and program exits with code 1,
+- data errors, e.g. malformed row - invalid rows are skipped, message is printed to stderr.
+
+== Non-goals
+
+Given time - few hours - is enough to create good prototype, but it is too little to focus on other aspects like unit-testing, optimizations. Especially because of some unclear parts of tasks (see *My assumptions*) it is hard to figure out "correct" behavior.
