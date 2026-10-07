@@ -62,7 +62,7 @@ impl BalanceProcessor {
     if account.is_locked() {
       return Err("Account is locked!".into());
     }
-    if account.amount_available < withdrawal.amount() {
+    if account.amount_available < withdrawal.amount().get() {
       return Err("Not sufficient funds to make withdrawal".into());
     }
 

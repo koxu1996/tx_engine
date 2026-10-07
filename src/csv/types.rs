@@ -41,10 +41,10 @@ impl TryFrom<TransactionRow> for Transaction {
     // pair is rejected here and cannot reach the engine.
     let tx = match (row.type_, amount) {
       (RowType::Deposit, Some(amount)) => {
-        Self::Deposit(DepositTx::new(row.client, row.tx, amount)?)
+        Self::Deposit(DepositTx::new(row.client, row.tx, TxAmount::new(amount)?))
       }
       (RowType::Withdrawal, Some(amount)) => {
-        Self::Withdrawal(WithdrawalTx::new(row.client, row.tx, amount)?)
+        Self::Withdrawal(WithdrawalTx::new(row.client, row.tx, TxAmount::new(amount)?))
       }
       (RowType::Deposit | RowType::Withdrawal, None) => {
         return Err("Malformed data: deposit/withdrawal must have amount field.".into());

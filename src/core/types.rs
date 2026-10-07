@@ -53,10 +53,10 @@ impl Account {
 
   /// Increases available amount, as a result of deposit.
   /// Returns error when the result does not fit in **Decimal**.
-  pub fn deposit(&mut self, amount: Decimal) -> Result<(), Box<dyn Error>> {
+  pub fn deposit(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
     self.amount_available = self
       .amount_available
-      .checked_add(amount)
+      .checked_add(amount.get())
       .ok_or_else(|| Box::<dyn Error>::from("Available amount overflowed"))?;
 
     Ok(())
@@ -64,10 +64,10 @@ impl Account {
 
   /// Decreases available amount, as a result of withdrawal.
   /// Returns error when the result does not fit in **Decimal**.
-  pub fn withdraw(&mut self, amount: Decimal) -> Result<(), Box<dyn Error>> {
+  pub fn withdraw(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
     self.amount_available = self
       .amount_available
-      .checked_sub(amount)
+      .checked_sub(amount.get())
       .ok_or_else(|| Box::<dyn Error>::from("Available amount overflowed"))?;
 
     Ok(())
@@ -75,15 +75,15 @@ impl Account {
 
   /// Moves amount from available to held, as a result of dispute.
   /// Both amounts change together, or neither of them changes.
-  pub fn hold(&mut self, amount: Decimal) -> Result<(), Box<dyn Error>> {
+  pub fn hold(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
     // Calculate both amounts first.
     let available = self
       .amount_available
-      .checked_sub(amount)
+      .checked_sub(amount.get())
       .ok_or_else(|| Box::<dyn Error>::from("Available amount overflowed"))?;
     let held = self
       .amount_held
-      .checked_add(amount)
+      .checked_add(amount.get())
       .ok_or_else(|| Box::<dyn Error>::from("Held amount overflowed"))?;
 
     self.amount_available = available;
@@ -94,14 +94,14 @@ impl Account {
 
   /// Moves amount from held back to available, as a result of resolve.
   /// Both amounts change together, or neither of them changes.
-  pub fn release(&mut self, amount: Decimal) -> Result<(), Box<dyn Error>> {
+  pub fn release(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
     let available = self
       .amount_available
-      .checked_add(amount)
+      .checked_add(amount.get())
       .ok_or_else(|| Box::<dyn Error>::from("Available amount overflowed"))?;
     let held = self
       .amount_held
-      .checked_sub(amount)
+      .checked_sub(amount.get())
       .ok_or_else(|| Box::<dyn Error>::from("Held amount overflowed"))?;
 
     self.amount_available = available;
@@ -112,10 +112,10 @@ impl Account {
 
   /// Decreases held amount, as a result of chargeback.
   /// The money leaves the account, so it does not return to available.
-  pub fn withdraw_held(&mut self, amount: Decimal) -> Result<(), Box<dyn Error>> {
+  pub fn withdraw_held(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
     self.amount_held = self
       .amount_held
-      .checked_sub(amount)
+      .checked_sub(amount.get())
       .ok_or_else(|| Box::<dyn Error>::from("Held amount overflowed"))?;
 
     Ok(())
@@ -133,13 +133,25 @@ pub enum DisputeStatus {
 /// Transaction ID
 pub type TransactionId = u32;
 
-/// Validates the amount of a transaction that moves money.
-fn validate_amount(amount: Decimal) -> Result<(), Box<dyn Error>> {
-  if amount <= Decimal::ZERO {
-    return Err("Amount must be greater than 0".into());
+/// Amount that transaction moves, always above zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TxAmount(Decimal); // use Decimal to avoid round-off
+
+impl TxAmount {
+  /// Constructs new *TxAmount*.
+  /// Returns error when the value is not above zero.
+  pub fn new(value: Decimal) -> Result<Self, Box<dyn Error>> {
+    if value <= Decimal::ZERO {
+      return Err("Amount must be greater than 0".into());
+    }
+
+    Ok(Self(value))
   }
 
-  Ok(())
+  /// The value as a **Decimal**.
+  pub fn get(self) -> Decimal {
+    self.0
+  }
 }
 
 /// Details of deposit transaction.
@@ -150,20 +162,17 @@ pub struct DepositTx {
   /// Transaction ID.
   pub tx: TransactionId,
   /// Deposited amount.
-  amount: Decimal, // use Decimal to avoid round-off
+  amount: TxAmount,
 }
 
 impl DepositTx {
   /// Constructs new *DepositTx*.
-  /// Returns error when the amount is not above zero.
-  pub fn new(client: ClientId, tx: TransactionId, amount: Decimal) -> Result<Self, Box<dyn Error>> {
-    validate_amount(amount)?;
-
-    Ok(Self { client, tx, amount })
+  pub fn new(client: ClientId, tx: TransactionId, amount: TxAmount) -> Self {
+    Self { client, tx, amount }
   }
 
-  /// Deposited amount, which is always above zero.
-  pub fn amount(&self) -> Decimal {
+  /// Deposited amount.
+  pub fn amount(&self) -> TxAmount {
     self.amount
   }
 }
@@ -176,20 +185,17 @@ pub struct WithdrawalTx {
   /// Transaction ID.
   pub tx: TransactionId,
   /// Withdrawn amount.
-  amount: Decimal, // use Decimal to avoid round-off
+  amount: TxAmount,
 }
 
 impl WithdrawalTx {
   /// Constructs new *WithdrawalTx*.
-  /// Returns error when the amount is not above zero.
-  pub fn new(client: ClientId, tx: TransactionId, amount: Decimal) -> Result<Self, Box<dyn Error>> {
-    validate_amount(amount)?;
-
-    Ok(Self { client, tx, amount })
+  pub fn new(client: ClientId, tx: TransactionId, amount: TxAmount) -> Self {
+    Self { client, tx, amount }
   }
 
-  /// Withdrawn amount, which is always above zero.
-  pub fn amount(&self) -> Decimal {
+  /// Withdrawn amount.
+  pub fn amount(&self) -> TxAmount {
     self.amount
   }
 }
