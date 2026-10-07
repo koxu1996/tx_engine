@@ -21,7 +21,7 @@ pub struct Account {
 impl Account {
   /// Constructs new account.
   pub fn new(id: ClientId) -> Self {
-    Account {
+    Self {
       id,
       amount_available: Decimal::ZERO,
       amount_held: Decimal::ZERO,
@@ -242,11 +242,11 @@ impl Transaction {
   /// Client ID of this transaction.
   pub fn client(&self) -> ClientId {
     match self {
-      Transaction::Deposit(details) => details.client,
-      Transaction::Withdrawal(details) => details.client,
-      Transaction::Dispute(details) => details.client,
-      Transaction::Resolve(details) => details.client,
-      Transaction::Chargeback(details) => details.client,
+      Self::Deposit(details) => details.client,
+      Self::Withdrawal(details) => details.client,
+      Self::Dispute(details) => details.client,
+      Self::Resolve(details) => details.client,
+      Self::Chargeback(details) => details.client,
     }
   }
 }
