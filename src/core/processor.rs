@@ -24,9 +24,9 @@ impl BalanceProcessor {
   /// 2. Transaction is stored.
   fn process_deposit(&mut self, deposit: DepositTx) -> Result<(), Box<dyn Error>> {
     // Validation
-    self.storage.transactions.assert_unique_id(&deposit.tx)?;
+    self.storage.transactions.assert_unique_id(deposit.tx)?;
     // The account may not exist yet, and an unknown client is not locked.
-    if let Some(account) = self.storage.accounts.get(&deposit.client)
+    if let Some(account) = self.storage.accounts.get(deposit.client)
       && account.is_locked()
     {
       return Err("Account is locked!".into());
@@ -57,8 +57,8 @@ impl BalanceProcessor {
   /// 2. Transaction is stored.
   fn process_withdrawal(&mut self, withdrawal: WithdrawalTx) -> Result<(), Box<dyn Error>> {
     // Validation
-    self.storage.transactions.assert_unique_id(&withdrawal.tx)?;
-    let account = self.storage.accounts.get_mut(&withdrawal.client)?;
+    self.storage.transactions.assert_unique_id(withdrawal.tx)?;
+    let account = self.storage.accounts.get_mut(withdrawal.client)?;
     if account.is_locked() {
       return Err("Account is locked!".into());
     }
@@ -91,7 +91,7 @@ impl BalanceProcessor {
   /// 3. Dispute is stored.
   fn process_dispute(&mut self, dispute: DisputeTx) -> Result<(), Box<dyn Error>> {
     // Validation
-    let ref_tx = self.storage.transactions.get(&dispute.ref_tx)?;
+    let ref_tx = self.storage.transactions.get(dispute.ref_tx)?;
     if ref_tx.client() != dispute.client {
       return Err("Mismatched client id!".into());
     }
@@ -100,10 +100,10 @@ impl BalanceProcessor {
       return Err("Cannot dispute transaction different than deposit".into());
     };
     let ref_tx_amount = ref_deposit.amount();
-    if self.storage.disputes.has(&dispute.ref_tx) {
+    if self.storage.disputes.has(dispute.ref_tx) {
       return Err("Dispute already created/processed!".into());
     }
-    let account = self.storage.accounts.get_mut(&dispute.client)?;
+    let account = self.storage.accounts.get_mut(dispute.client)?;
 
     // Effects
     account.hold(ref_tx_amount)?;
@@ -129,7 +129,7 @@ impl BalanceProcessor {
   /// 3. Dispute is marked as resolved.
   fn process_resolve(&mut self, resolve: ResolveTx) -> Result<(), Box<dyn Error>> {
     // Validation
-    let ref_tx = self.storage.transactions.get(&resolve.ref_tx)?;
+    let ref_tx = self.storage.transactions.get(resolve.ref_tx)?;
     if ref_tx.client() != resolve.client {
       return Err("Mismatched client id!".into());
     }
@@ -138,11 +138,11 @@ impl BalanceProcessor {
       return Err("Cannot resolve transaction different than deposit".into());
     };
     let ref_tx_amount = ref_deposit.amount();
-    let dispute = self.storage.disputes.get_mut(&resolve.ref_tx)?;
+    let dispute = self.storage.disputes.get_mut(resolve.ref_tx)?;
     if *dispute != DisputeStatus::Started {
       return Err("Dispute has no 'started' state!".into());
     }
-    let account = self.storage.accounts.get_mut(&resolve.client)?;
+    let account = self.storage.accounts.get_mut(resolve.client)?;
 
     // Effects
     account.release(ref_tx_amount)?;
@@ -168,7 +168,7 @@ impl BalanceProcessor {
   /// 3. Dispute is marked as chargeback-ed.
   fn process_chargeback(&mut self, chargeback: ChargebackTx) -> Result<(), Box<dyn Error>> {
     // Validation
-    let ref_tx = self.storage.transactions.get(&chargeback.ref_tx)?;
+    let ref_tx = self.storage.transactions.get(chargeback.ref_tx)?;
     if ref_tx.client() != chargeback.client {
       return Err("Mismatched client id!".into());
     }
@@ -177,11 +177,11 @@ impl BalanceProcessor {
       return Err("Cannot resolve transaction different than deposit".into());
     };
     let ref_tx_amount = ref_deposit.amount();
-    let dispute = self.storage.disputes.get_mut(&chargeback.ref_tx)?;
+    let dispute = self.storage.disputes.get_mut(chargeback.ref_tx)?;
     if *dispute != DisputeStatus::Started {
       return Err("Dispute has no 'started' state!".into());
     }
-    let account = self.storage.accounts.get_mut(&chargeback.client)?;
+    let account = self.storage.accounts.get_mut(chargeback.client)?;
 
     // Effects
     account.withdraw_held(ref_tx_amount)?;

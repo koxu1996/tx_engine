@@ -17,13 +17,16 @@ pub struct AccountsStorage(HashMap<ClientId, Account>);
 
 impl AccountsStorage {
   /// Gets account from storage, when the client is already known.
-  pub fn get(&self, id: &ClientId) -> Option<&Account> {
-    self.0.get(id)
+  pub fn get(&self, id: ClientId) -> Option<&Account> {
+    self.0.get(&id)
   }
 
   /// Gets account from storage - mutable version.
-  pub fn get_mut(&mut self, id: &ClientId) -> Result<&mut Account, Box<dyn Error>> {
-    self.0.get_mut(id).ok_or_else(|| "Account not found".into())
+  pub fn get_mut(&mut self, id: ClientId) -> Result<&mut Account, Box<dyn Error>> {
+    self
+      .0
+      .get_mut(&id)
+      .ok_or_else(|| "Account not found".into())
   }
 
   /// Gets account from storage, or creates an empty one when the client
@@ -60,13 +63,16 @@ impl TransactionsStorage {
   }
 
   /// Gets transaction from storage.
-  pub fn get(&self, id: &TransactionId) -> Result<&Transaction, Box<dyn Error>> {
-    self.0.get(id).ok_or_else(|| "Transaction not found".into())
+  pub fn get(&self, id: TransactionId) -> Result<&Transaction, Box<dyn Error>> {
+    self
+      .0
+      .get(&id)
+      .ok_or_else(|| "Transaction not found".into())
   }
 
   /// Checks if given ID is unique among already existing transactions
-  pub fn assert_unique_id(&self, id: &TransactionId) -> Result<(), Box<dyn Error>> {
-    if self.0.contains_key(id) {
+  pub fn assert_unique_id(&self, id: TransactionId) -> Result<(), Box<dyn Error>> {
+    if self.0.contains_key(&id) {
       return Err("Transaction ID is not unique".into());
     }
     Ok(())
@@ -86,12 +92,15 @@ impl DisputesStorage {
   }
 
   /// Checks if dispute for given transaction is already stored.
-  pub fn has(&self, id: &TransactionId) -> bool {
-    self.0.contains_key(id)
+  pub fn has(&self, id: TransactionId) -> bool {
+    self.0.contains_key(&id)
   }
 
   /// Gets dispute from storage - mutable version.
-  pub fn get_mut(&mut self, id: &TransactionId) -> Result<&mut DisputeStatus, Box<dyn Error>> {
-    self.0.get_mut(id).ok_or_else(|| "Dispute not found".into())
+  pub fn get_mut(&mut self, id: TransactionId) -> Result<&mut DisputeStatus, Box<dyn Error>> {
+    self
+      .0
+      .get_mut(&id)
+      .ok_or_else(|| "Dispute not found".into())
   }
 }
