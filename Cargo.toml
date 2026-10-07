@@ -16,3 +16,6 @@ serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 
 # Parser for the command line arguments.
 clap = { version = "4.6.7", default-features = false, features = ["derive", "std", "help", "usage", "error-context", "color"] }
+
+# Derive macro for the error types.
+thiserror = { version = "2.0.21", default-features = false, features = [] }
