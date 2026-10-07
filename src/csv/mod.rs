@@ -88,14 +88,14 @@ impl CsvProvider {
     match order {
       SummaryOrder::ByClientId => {
         // We have to collect accounts into sorted vector.
-        let mut accounts: Vec<_> = self.processor.get_accounts_iter().map(|(_, a)| a).collect();
+        let mut accounts: Vec<_> = self.processor.get_accounts_iter().collect();
         accounts.sort_unstable_by_key(|a| a.id);
         for account in accounts {
           Self::write_account(&mut wtr, account)?;
         }
       }
       SummaryOrder::Unsorted => {
-        for (_, account) in self.processor.get_accounts_iter() {
+        for account in self.processor.get_accounts_iter() {
           Self::write_account(&mut wtr, account)?;
         }
       }

@@ -39,9 +39,9 @@ impl AccountsStorage {
     self.0.remove(id);
   }
 
-  /// Gets raw map used by storage.
-  pub fn raw(&self) -> &HashMap<ClientId, Account> {
-    &self.0
+  /// Gets iterator over the stored accounts.
+  pub fn iter(&self) -> impl Iterator<Item = &Account> {
+    self.0.values()
   }
 }
 

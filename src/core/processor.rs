@@ -217,7 +217,7 @@ impl BalanceProcessor {
   }
 
   /// Gets iterator for account map.
-  pub fn get_accounts_iter(&self) -> impl Iterator<Item = (&ClientId, &Account)> {
-    self.storage.accounts.raw().iter()
+  pub fn get_accounts_iter(&self) -> impl Iterator<Item = &Account> {
+    self.storage.accounts.iter()
   }
 }
