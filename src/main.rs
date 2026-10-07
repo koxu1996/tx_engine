@@ -6,10 +6,7 @@ use tx_engine::csv;
 
 fn main() {
   // Load program configuration from args.
-  let config = cli::parse_args().unwrap_or_else(|err| {
-    eprintln!("Problem parsing arguments: {}", err);
-    process::exit(1);
-  });
+  let config = cli::parse_args();
 
   // Load given CSV into transaction processor.
   let mut provider = csv::CsvProvider::default();

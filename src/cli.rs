@@ -11,7 +11,7 @@ pub struct AppConfig {
   pub input: PathBuf,
 }
 
-/// Constructs *AppConfig* by parsing program args.
-pub fn parse_args() -> Result<AppConfig, clap::Error> {
-  AppConfig::try_parse()
+/// Constructs *AppConfig* by parsing program args, exits on error.
+pub fn parse_args() -> AppConfig {
+  AppConfig::parse()
 }
