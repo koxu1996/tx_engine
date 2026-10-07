@@ -6,13 +6,13 @@ edition = "2024"
 [dependencies]
 
 # Fixed-point decimal numbers, to avoid the round-off errors on the amounts.
-rust_decimal = { version = "1.43.0", default-features = false, features = ["serde", "std"] }
+rust_decimal = { version = "1.43.0", default-features = false, features = ["serde"] }
 
 # Reader and writer for the CSV format.
 csv = { version = "1.4.0", default-features = false, features = [] }
 
 # Serialization framework, for the CSV rows.
-serde = { version = "1.0.229", default-features = false, features = ["std", "derive"] }
+serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 
 # Parser for the command line arguments.
-structopt = { version = "0.3.26", default-features = false, features = ["default"] }
+structopt = { version = "0.3.26", default-features = false, features = [] }
