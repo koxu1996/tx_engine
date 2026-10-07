@@ -36,7 +36,7 @@ impl BalanceProcessor {
     // A deposit is the only kind that may create an account. Every check
     // above is read-only, so a rejected deposit leaves no account behind.
     let account = self.storage.accounts.get_or_create(deposit.client);
-    account.deposit(deposit.amount)?;
+    account.deposit(deposit.amount())?;
     self.storage.transactions.add_deposit(deposit);
 
     Ok(())
@@ -62,12 +62,12 @@ impl BalanceProcessor {
     if account.is_locked {
       return Err("Account is locked!".into());
     }
-    if account.amount_available < withdrawal.amount {
+    if account.amount_available < withdrawal.amount() {
       return Err("Not sufficient funds to make withdrawal".into());
     }
 
     // Effects
-    account.withdraw(withdrawal.amount)?;
+    account.withdraw(withdrawal.amount())?;
     self.storage.transactions.add_withdrawal(withdrawal);
 
     Ok(())
@@ -99,7 +99,7 @@ impl BalanceProcessor {
     let Transaction::Deposit(ref_deposit) = ref_tx else {
       return Err("Cannot dispute transaction different than deposit".into());
     };
-    let ref_tx_amount = ref_deposit.amount;
+    let ref_tx_amount = ref_deposit.amount();
     if self.storage.disputes.has(&dispute.ref_tx) {
       return Err("Dispute already created/processed!".into());
     }
@@ -137,7 +137,7 @@ impl BalanceProcessor {
     let Transaction::Deposit(ref_deposit) = ref_tx else {
       return Err("Cannot resolve transaction different than deposit".into());
     };
-    let ref_tx_amount = ref_deposit.amount;
+    let ref_tx_amount = ref_deposit.amount();
     let dispute = self.storage.disputes.get_mut(&resolve.ref_tx)?;
     if *dispute != DisputeStatus::Started {
       return Err("Dispute has no 'started' state!".into());
@@ -176,7 +176,7 @@ impl BalanceProcessor {
     let Transaction::Deposit(ref_deposit) = ref_tx else {
       return Err("Cannot resolve transaction different than deposit".into());
     };
-    let ref_tx_amount = ref_deposit.amount;
+    let ref_tx_amount = ref_deposit.amount();
     let dispute = self.storage.disputes.get_mut(&chargeback.ref_tx)?;
     if *dispute != DisputeStatus::Started {
       return Err("Dispute has no 'started' state!".into());

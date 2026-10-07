@@ -133,7 +133,6 @@ fn validate_amount(amount: Decimal) -> Result<(), Box<dyn Error>> {
 }
 
 /// Details of deposit transaction.
-/// The amount is always present, and always above zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DepositTx {
   /// Client ID.
@@ -141,8 +140,7 @@ pub struct DepositTx {
   /// Transaction ID.
   pub tx: TransactionId,
   /// Deposited amount.
-  pub amount: Decimal, // use Decimal to avoid round-off
-  _private: (),
+  amount: Decimal, // use Decimal to avoid round-off
 }
 
 impl DepositTx {
@@ -151,26 +149,24 @@ impl DepositTx {
   pub fn new(client: ClientId, tx: TransactionId, amount: Decimal) -> Result<Self, Box<dyn Error>> {
     validate_amount(amount)?;
 
-    Ok(Self {
-      client,
-      tx,
-      amount,
-      _private: (),
-    })
+    Ok(Self { client, tx, amount })
+  }
+
+  /// Deposited amount, which is always above zero.
+  pub fn amount(&self) -> Decimal {
+    self.amount
   }
 }
 
 /// Details of withdrawal transaction.
-/// The amount is always present, and always above zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WithdrawalTx {
   /// Client ID.
   pub client: ClientId,
   /// Transaction ID.
   pub tx: TransactionId,
-  /// Withdrawaled amount.
-  pub amount: Decimal, // use Decimal to avoid round-off
-  _private: (),
+  /// Withdrawn amount.
+  amount: Decimal, // use Decimal to avoid round-off
 }
 
 impl WithdrawalTx {
@@ -179,12 +175,12 @@ impl WithdrawalTx {
   pub fn new(client: ClientId, tx: TransactionId, amount: Decimal) -> Result<Self, Box<dyn Error>> {
     validate_amount(amount)?;
 
-    Ok(Self {
-      client,
-      tx,
-      amount,
-      _private: (),
-    })
+    Ok(Self { client, tx, amount })
+  }
+
+  /// Withdrawn amount, which is always above zero.
+  pub fn amount(&self) -> Decimal {
+    self.amount
   }
 }
 
