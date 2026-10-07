@@ -28,33 +28,47 @@ pub struct TransactionRow {
   amount: Option<Decimal>,
 }
 
-impl TryFrom<TransactionRow> for Transaction {
+/// A *Transaction* as it arrives from a CSV row.
+#[derive(Debug, Deserialize)]
+#[serde(try_from = "TransactionRow")]
+pub struct CsvTransaction(Transaction);
+
+impl CsvTransaction {
+  /// The transaction that the row described.
+  pub fn into_inner(self) -> Transaction {
+    self.0
+  }
+}
+
+impl TryFrom<TransactionRow> for CsvTransaction {
   type Error = Box<dyn Error>;
 
   /// Converts row into valid *Transaction*, which is returned afterwards.
   /// In case of any problem Error is returned.
   fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
+    use Transaction as T;
+
     // Map amount field into a TxAmount, if present.
     let amount = row.amount.map(TxAmount::new).transpose()?;
 
     // Map the row onto a transaction.
     let tx = match (row.type_, amount) {
-      (RowType::Deposit, Some(amount)) => Self::Deposit(DepositTx::new(row.client, row.tx, amount)),
+      (RowType::Deposit, Some(amount)) => T::Deposit(DepositTx::new(row.client, row.tx, amount)),
       (RowType::Withdrawal, Some(amount)) => {
-        Self::Withdrawal(WithdrawalTx::new(row.client, row.tx, amount))
+        T::Withdrawal(WithdrawalTx::new(row.client, row.tx, amount))
       }
       (RowType::Deposit | RowType::Withdrawal, None) => {
         return Err("Malformed data: deposit/withdrawal must have amount field.".into());
       }
-      (RowType::Dispute, None) => Self::Dispute(DisputeTx {
+      (RowType::Dispute, None) => T::Dispute(DisputeTx {
         client: row.client,
         ref_tx: row.tx,
       }),
-      (RowType::Resolve, None) => Self::Resolve(ResolveTx {
+      (RowType::Resolve, None) => T::Resolve(ResolveTx {
         client: row.client,
         ref_tx: row.tx,
       }),
-      (RowType::Chargeback, None) => Self::Chargeback(ChargebackTx {
+      (RowType::Chargeback, None) => T::Chargeback(ChargebackTx {
         client: row.client,
         ref_tx: row.tx,
       }),
@@ -63,7 +77,7 @@ impl TryFrom<TransactionRow> for Transaction {
       }
     };
 
-    Ok(tx)
+    Ok(Self(tx))
   }
 }
 

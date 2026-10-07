@@ -9,7 +9,7 @@ use std::path::Path;
 use csv::ReaderBuilder;
 
 use crate::core::processor::*;
-use crate::core::types::{Account, Transaction};
+use crate::core::types::Account;
 use types::*;
 
 /// Order of the accounts in the printed summary.
@@ -52,24 +52,16 @@ impl CsvProvider {
       .trim(csv::Trim::All)
       .from_reader(reader);
 
-    // For every line in CSV perform deserialization into *Row*,
-    // then convert it to *Transaction* and finally feed into *processor*.
+    // For every line in CSV perform deserialization into *Transaction*, via *TransactionRow*.
     // **Note:** We pass transaction ownership to *processor*.
-    for result in rdr.deserialize::<TransactionRow>() {
+    for result in rdr.deserialize::<CsvTransaction>() {
       // Skip invalid rows.
-      let Ok(row) = result.inspect_err(|e| eprintln!("Skipping invalid row: {e}")) else {
-        continue;
-      };
-
-      // Skip invalid tx.
-      let Ok(tx) =
-        Transaction::try_from(row).inspect_err(|e| eprintln!("Error during convert: {e}"))
-      else {
+      let Ok(tx) = result.inspect_err(|e| eprintln!("Skipping invalid row: {e}")) else {
         continue;
       };
 
       // Feed processor with tx.
-      if let Err(e) = self.processor.feed_tx(tx) {
+      if let Err(e) = self.processor.feed_tx(tx.into_inner()) {
         eprintln!("Error during transaction processing: {e}");
       }
     }
