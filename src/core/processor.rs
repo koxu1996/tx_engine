@@ -95,7 +95,7 @@ impl BalanceProcessor {
       return Err("Cannot dispute transaction different than deposit".into());
     };
     let ref_tx_amount = ref_deposit.amount;
-    if self.storage.disputes.get(&dispute.ref_tx).is_ok() {
+    if self.storage.disputes.has(&dispute.ref_tx) {
       return Err("Dispute already created/processed!".into());
     }
     let account = self.storage.accounts.get_mut(&dispute.client)?;

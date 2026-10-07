@@ -92,9 +92,9 @@ impl DisputesStorage {
     self.0.insert(id, dispute);
   }
 
-  /// Gets dispute from storage.
-  pub fn get(&self, id: &TransactionId) -> Result<&DisputeStatus, Box<dyn Error>> {
-    self.0.get(id).ok_or_else(|| "Dispute not found".into())
+  /// Checks if dispute for given transaction is already stored.
+  pub fn has(&self, id: &TransactionId) -> bool {
+    self.0.contains_key(id)
   }
 
   /// Gets dispute from storage - mutable version.
