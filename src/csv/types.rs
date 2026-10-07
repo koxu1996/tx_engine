@@ -74,8 +74,13 @@ impl TryFrom<TransactionRow> for Transaction {
 /// Model that represents CSV row with account details.
 pub struct AccountRow {
   client: u16,
+  /// For all three numbers we rely on rust_decimal feature to avoid
+  /// default float variant that drops digits during serialization.
+  #[serde(with = "rust_decimal::serde::str")]
   available: Decimal,
+  #[serde(with = "rust_decimal::serde::str")]
   held: Decimal,
+  #[serde(with = "rust_decimal::serde::str")]
   total: Decimal,
   locked: bool,
 }
