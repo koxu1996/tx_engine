@@ -16,8 +16,10 @@ fn main() {
   });
 
   // Print summary of each client - balance, lock status.
-  provider.print_accounts_summary().unwrap_or_else(|err| {
-    eprintln!("Unable to print accounts summary: {}", err);
-    process::exit(1);
-  });
+  provider
+    .print_accounts_summary(csv::SummaryOrder::Unsorted)
+    .unwrap_or_else(|err| {
+      eprintln!("Unable to print accounts summary: {}", err);
+      process::exit(1);
+    });
 }
