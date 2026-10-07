@@ -15,8 +15,7 @@ pub struct Account {
   /// Held amount (under dispute).
   pub amount_held: Decimal,
   /// Is account locked?
-  pub is_locked: bool,
-  _private: (),
+  is_locked: bool,
 }
 
 impl Account {
@@ -27,8 +26,19 @@ impl Account {
       amount_available: Decimal::ZERO,
       amount_held: Decimal::ZERO,
       is_locked: false,
-      _private: (),
     }
+  }
+
+  /// Is account locked?
+  pub fn is_locked(&self) -> bool {
+    self.is_locked
+  }
+
+  /// Locks the account, as a result of a chargeback.
+  /// The lock is final, because only a human can release it, so there is
+  /// no function that unlocks the account.
+  pub fn lock(&mut self) {
+    self.is_locked = true;
   }
 
   /// Calculates total amount of money,

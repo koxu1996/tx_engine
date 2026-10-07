@@ -83,7 +83,7 @@ impl AccountRow {
       available: account.amount_available,
       held: account.amount_held,
       total: account.amount_total()?,
-      locked: account.is_locked,
+      locked: account.is_locked(),
     })
   }
 }

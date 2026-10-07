@@ -27,7 +27,7 @@ impl BalanceProcessor {
     self.storage.transactions.assert_unique_id(&deposit.tx)?;
     // The account may not exist yet, and an unknown client is not locked.
     if let Some(account) = self.storage.accounts.get(&deposit.client)
-      && account.is_locked
+      && account.is_locked()
     {
       return Err("Account is locked!".into());
     }
@@ -59,7 +59,7 @@ impl BalanceProcessor {
     // Validation
     self.storage.transactions.assert_unique_id(&withdrawal.tx)?;
     let account = self.storage.accounts.get_mut(&withdrawal.client)?;
-    if account.is_locked {
+    if account.is_locked() {
       return Err("Account is locked!".into());
     }
     if account.amount_available < withdrawal.amount() {
@@ -185,7 +185,7 @@ impl BalanceProcessor {
 
     // Effects
     account.withdraw_held(ref_tx_amount)?;
-    account.is_locked = true;
+    account.lock();
     *dispute = DisputeStatus::Chargeback;
 
     Ok(())
