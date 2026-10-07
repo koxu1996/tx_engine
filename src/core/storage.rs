@@ -54,12 +54,20 @@ impl AccountsStorage {
 pub struct TransactionsStorage(HashMap<TransactionId, Transaction>);
 
 impl TransactionsStorage {
-  /// Adds transaction to storage.
+  /// Adds deposit to storage, under its own transaction ID.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
-  pub fn add(&mut self, transaction: Transaction) {
-    let id = transaction.tx;
-    self.0.insert(id, transaction);
+  pub fn add_deposit(&mut self, deposit: DepositTx) {
+    self.0.insert(deposit.tx, Transaction::Deposit(deposit));
+  }
+
+  /// Adds withdrawal to storage, under its own transaction ID.
+  /// *Caution:* make sure transaction id is unique, otherwise
+  /// existing data will be overwritten.
+  pub fn add_withdrawal(&mut self, withdrawal: WithdrawalTx) {
+    self
+      .0
+      .insert(withdrawal.tx, Transaction::Withdrawal(withdrawal));
   }
 
   /// Gets transaction from storage.

@@ -24,8 +24,8 @@ impl Account {
   pub fn new(id: ClientId) -> Self {
     Account {
       id,
-      amount_available: Decimal::new(0, 0),
-      amount_held: Decimal::new(0, 0),
+      amount_available: Decimal::ZERO,
+      amount_held: Decimal::ZERO,
       is_locked: false,
       _private: (),
     }
@@ -123,60 +123,125 @@ pub enum DisputeStatus {
 /// Transaction ID
 pub type TransactionId = u32;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-/// Transaction type - deposit / withdrawal / dispute, etc.
-pub enum TransactionType {
-  Deposit,
-  Withdrawal,
-  Dispute,
-  Resolve,
-  Chargeback,
+/// Validates the amount of a transaction that moves money.
+fn validate_amount(amount: Decimal) -> Result<(), Box<dyn Error>> {
+  if amount <= Decimal::ZERO {
+    return Err("Amount must be greater than 0".into());
+  }
+
+  Ok(())
 }
 
-#[derive(Debug)]
-pub struct Transaction {
-  /// Type: deposit / withdrawal / dispute, etc.
-  pub kind: TransactionType,
+/// Details of deposit transaction.
+/// The amount is always present, and always above zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DepositTx {
   /// Client ID.
   pub client: ClientId,
   /// Transaction ID.
   pub tx: TransactionId,
-  /// Associated amount.
-  pub amount: Option<Decimal>, // use Decimal to avoid round-off
+  /// Deposited amount.
+  pub amount: Decimal, // use Decimal to avoid round-off
   _private: (),
 }
 
-impl Transaction {
-  /// Constructs new *Transaction*.
-  pub fn new(
-    kind: TransactionType,
-    client: ClientId,
-    tx: TransactionId,
-    amount: Option<Decimal>,
-  ) -> Result<Self, Box<dyn Error>> {
-    // Validate amount: must be above 0.0.
-    if let Some(x) = amount
-      && x <= Decimal::ZERO
-    {
-      return Err("Amount must be greater than 0".into());
-    }
-
-    // Reject malformed data: when dispute/resolve/chargeback has amount field.
-    if matches!(
-      kind,
-      TransactionType::Dispute | TransactionType::Resolve | TransactionType::Chargeback
-    ) && amount.is_some()
-    {
-      return Err("Malformed data: dispute/resolve/chargeback cannot have amount field.".into());
-    }
+impl DepositTx {
+  /// Constructs new *DepositTx*.
+  /// Returns error when the amount is not above zero.
+  pub fn new(client: ClientId, tx: TransactionId, amount: Decimal) -> Result<Self, Box<dyn Error>> {
+    validate_amount(amount)?;
 
     Ok(Self {
-      kind,
       client,
       tx,
       amount,
       _private: (),
     })
+  }
+}
+
+/// Details of withdrawal transaction.
+/// The amount is always present, and always above zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WithdrawalTx {
+  /// Client ID.
+  pub client: ClientId,
+  /// Transaction ID.
+  pub tx: TransactionId,
+  /// Withdrawaled amount.
+  pub amount: Decimal, // use Decimal to avoid round-off
+  _private: (),
+}
+
+impl WithdrawalTx {
+  /// Constructs new *WithdrawalTx*.
+  /// Returns error when the amount is not above zero.
+  pub fn new(client: ClientId, tx: TransactionId, amount: Decimal) -> Result<Self, Box<dyn Error>> {
+    validate_amount(amount)?;
+
+    Ok(Self {
+      client,
+      tx,
+      amount,
+      _private: (),
+    })
+  }
+}
+
+/// Details of dispute transaction.
+/// It refers to an earlier transaction, so it carries no amount.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DisputeTx {
+  /// Client ID.
+  pub client: ClientId,
+  /// ID of the referenced transaction.
+  pub ref_tx: TransactionId,
+}
+
+/// Details of resolve transaction.
+/// It refers to an earlier transaction, so it carries no amount.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolveTx {
+  /// Client ID.
+  pub client: ClientId,
+  /// ID of the referenced transaction.
+  pub ref_tx: TransactionId,
+}
+
+/// Details of chargeback transaction.
+/// It refers to an earlier transaction, so it carries no amount.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChargebackTx {
+  /// Client ID.
+  pub client: ClientId,
+  /// ID of the referenced transaction.
+  pub ref_tx: TransactionId,
+}
+
+/// Transaction - deposit / withdrawal / dispute, etc.
+///
+/// Each kind carries its own details. Only the kinds that move money
+/// carry an amount, so a deposit without an amount, and a dispute with
+/// one, have no representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Transaction {
+  Deposit(DepositTx),
+  Withdrawal(WithdrawalTx),
+  Dispute(DisputeTx),
+  Resolve(ResolveTx),
+  Chargeback(ChargebackTx),
+}
+
+impl Transaction {
+  /// Client ID of this transaction.
+  pub fn client(&self) -> ClientId {
+    match self {
+      Transaction::Deposit(details) => details.client,
+      Transaction::Withdrawal(details) => details.client,
+      Transaction::Dispute(details) => details.client,
+      Transaction::Resolve(details) => details.client,
+      Transaction::Chargeback(details) => details.client,
+    }
   }
 }
 
