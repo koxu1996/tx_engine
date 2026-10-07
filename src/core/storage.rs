@@ -85,11 +85,11 @@ impl TransactionsStorage {
 pub struct DisputesStorage(HashMap<TransactionId, DisputeStatus>);
 
 impl DisputesStorage {
-  /// Adds dispute to storage.
+  /// Opens new dispute for given transaction.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
-  pub fn add(&mut self, id: TransactionId, dispute: DisputeStatus) {
-    self.0.insert(id, dispute);
+  pub fn open(&mut self, id: TransactionId) {
+    self.0.insert(id, DisputeStatus::Started);
   }
 
   /// Checks if dispute for given transaction is already stored.

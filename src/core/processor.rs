@@ -102,10 +102,7 @@ impl BalanceProcessor {
 
     // Effects
     account.hold(ref_tx_amount)?;
-    self
-      .storage
-      .disputes
-      .add(dispute.ref_tx, DisputeStatus::Started);
+    self.storage.disputes.open(dispute.ref_tx);
 
     Ok(())
   }
