@@ -4,32 +4,18 @@ use std::error::Error;
 use crate::core::types::*;
 
 /// Common storage for accounts, transactions and their disputes.
+#[derive(Default)]
 pub struct Storage {
   pub accounts: AccountsStorage,
   pub transactions: TransactionsStorage,
   pub disputes: DisputesStorage,
 }
 
-impl Storage {
-  /// Constructs new *Storage*.
-  pub fn new() -> Self {
-    Self {
-      accounts: AccountsStorage::new(),
-      transactions: TransactionsStorage::new(),
-      disputes: DisputesStorage::new(),
-    }
-  }
-}
-
 /// Map holding client Id and corresponding *Account*.
+#[derive(Default)]
 pub struct AccountsStorage(HashMap<ClientId, Account>);
 
 impl AccountsStorage {
-  /// Constructs new *AccountsStorage*.
-  pub fn new() -> Self {
-    Self(HashMap::new())
-  }
-
   /// Adds client account to storage.
   /// *Caution:* make sure account id is unique, otherwise
   /// existing data will be overwritten.
@@ -64,14 +50,10 @@ impl AccountsStorage {
 }
 
 /// Map holding transaction Id and corresponding *Transaction*.
+#[derive(Default)]
 pub struct TransactionsStorage(HashMap<TransactionId, Transaction>);
 
 impl TransactionsStorage {
-  /// Constructs new *TransactionsStorage*.
-  pub fn new() -> Self {
-    Self(HashMap::new())
-  }
-
   /// Adds transaction to storage.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
@@ -99,14 +81,10 @@ impl TransactionsStorage {
 }
 
 /// Map holding transaction Id and corresponding *Dispute*.
+#[derive(Default)]
 pub struct DisputesStorage(HashMap<TransactionId, Dispute>);
 
 impl DisputesStorage {
-  /// Constructs new *DisputesStorage*.
-  pub fn new() -> Self {
-    Self(HashMap::new())
-  }
-
   /// Adds dispute to storage.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.

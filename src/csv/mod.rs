@@ -13,18 +13,12 @@ use types::*;
 
 /// Model that can be used to for processing transactions
 /// stored in *.csv* format.
+#[derive(Default)]
 pub struct CsvProvider {
   processor: BalanceProcessor,
 }
 
 impl CsvProvider {
-  /// Creates new **CsvProvider** along with internal *processor*.
-  pub fn new() -> Self {
-    Self {
-      processor: BalanceProcessor::new(),
-    }
-  }
-
   /// Loads transactions from given path into internal *processor*.
   pub fn load_from_path(&mut self, path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
     // Prepare buffered reader.

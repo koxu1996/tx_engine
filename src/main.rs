@@ -12,7 +12,7 @@ fn main() {
   });
 
   // Load given CSV into transaction processor.
-  let mut provider = csv::CsvProvider::new();
+  let mut provider = csv::CsvProvider::default();
   provider.load_from_path(config.input).unwrap_or_else(|err| {
     eprintln!("Unable to load CSV file: {}", err);
     process::exit(1);

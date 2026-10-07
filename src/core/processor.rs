@@ -5,18 +5,12 @@ use crate::core::storage::*;
 use crate::core::types::*;
 
 /// Balance processor, with internal storage for accounts/transactions/disputes.
+#[derive(Default)]
 pub struct BalanceProcessor {
   storage: Storage,
 }
 
 impl BalanceProcessor {
-  /// Constructs new *BalanceProcessor*.
-  pub fn new() -> Self {
-    BalanceProcessor {
-      storage: Storage::new(),
-    }
-  }
-
   /// Processes deposit transaction.
   /// Validation rules:
   /// 1. Transaction ID is unique.
