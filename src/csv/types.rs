@@ -34,20 +34,15 @@ impl TryFrom<TransactionRow> for Transaction {
   /// Converts row into valid *Transaction*, which is returned afterwards.
   /// In case of any problem Error is returned.
   fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
-    let amount = row.amount;
+    // Map amount field into a TxAmount, if present.
+    let amount = row.amount.map(TxAmount::new).transpose()?;
 
-    // Map the row onto a transaction. The kinds that move money need
-    // the amount, and the other kinds must not carry one, so an invalid
-    // pair is rejected here and cannot reach the engine.
+    // Map the row onto a transaction.
     let tx = match (row.type_, amount) {
-      (RowType::Deposit, Some(amount)) => {
-        Self::Deposit(DepositTx::new(row.client, row.tx, TxAmount::new(amount)?))
+      (RowType::Deposit, Some(amount)) => Self::Deposit(DepositTx::new(row.client, row.tx, amount)),
+      (RowType::Withdrawal, Some(amount)) => {
+        Self::Withdrawal(WithdrawalTx::new(row.client, row.tx, amount))
       }
-      (RowType::Withdrawal, Some(amount)) => Self::Withdrawal(WithdrawalTx::new(
-        row.client,
-        row.tx,
-        TxAmount::new(amount)?,
-      )),
       (RowType::Deposit | RowType::Withdrawal, None) => {
         return Err("Malformed data: deposit/withdrawal must have amount field.".into());
       }
