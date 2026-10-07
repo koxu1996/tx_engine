@@ -9,7 +9,7 @@ use std::path::Path;
 use csv::ReaderBuilder;
 
 use crate::core::processor::*;
-use crate::core::types::Account;
+use crate::core::types::{Account, Transaction};
 use types::*;
 
 /// Order of the accounts in the printed summary.
@@ -58,7 +58,7 @@ impl CsvProvider {
     for result in rdr.deserialize::<TransactionRow>() {
       match result {
         Ok(row) => {
-          let tx = row.convert_to_tx();
+          let tx = Transaction::try_from(row);
           match tx {
             Err(e) => {
               eprintln!("Error during convert: {:?}", e);

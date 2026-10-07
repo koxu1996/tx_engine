@@ -16,12 +16,14 @@ pub struct TransactionRow {
   amount: Option<String>,
 }
 
-impl TransactionRow {
+impl TryFrom<TransactionRow> for Transaction {
+  type Error = Box<dyn Error>;
+
   /// Converts row into valid *Transaction*, which is returned afterwards.
   /// In case of any problem Error is returned.
-  pub fn convert_to_tx(&self) -> Result<Transaction, Box<dyn Error>> {
+  fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
     // Extract amount, when the row carries one.
-    let amount: Option<Decimal> = match &self.amount {
+    let amount: Option<Decimal> = match &row.amount {
       None => None,
       Some(s) => match Decimal::from_str(s.as_str()) {
         Ok(v) => Some(v),
@@ -32,27 +34,27 @@ impl TransactionRow {
     // Map the row onto a transaction. The kinds that move money need
     // the amount, and the other kinds must not carry one, so an invalid
     // pair is rejected here and cannot reach the engine.
-    let tx = match (self.type_.as_str(), amount) {
+    let tx = match (row.type_.as_str(), amount) {
       ("deposit", Some(amount)) => {
-        Transaction::Deposit(DepositTx::new(self.client, self.tx, amount)?)
+        Transaction::Deposit(DepositTx::new(row.client, row.tx, amount)?)
       }
       ("withdrawal", Some(amount)) => {
-        Transaction::Withdrawal(WithdrawalTx::new(self.client, self.tx, amount)?)
+        Transaction::Withdrawal(WithdrawalTx::new(row.client, row.tx, amount)?)
       }
       ("deposit" | "withdrawal", None) => {
         return Err("Malformed data: deposit/withdrawal must have amount field.".into());
       }
       ("dispute", None) => Transaction::Dispute(DisputeTx {
-        client: self.client,
-        ref_tx: self.tx,
+        client: row.client,
+        ref_tx: row.tx,
       }),
       ("resolve", None) => Transaction::Resolve(ResolveTx {
-        client: self.client,
-        ref_tx: self.tx,
+        client: row.client,
+        ref_tx: row.tx,
       }),
       ("chargeback", None) => Transaction::Chargeback(ChargebackTx {
-        client: self.client,
-        ref_tx: self.tx,
+        client: row.client,
+        ref_tx: row.tx,
       }),
       ("dispute" | "resolve" | "chargeback", Some(_)) => {
         return Err("Malformed data: dispute/resolve/chargeback cannot have amount field.".into());
