@@ -1,6 +1,6 @@
+pub mod error;
 pub mod types;
 
-use std::error::Error;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, Read};
@@ -10,6 +10,7 @@ use csv::ReaderBuilder;
 
 use crate::core::processor::*;
 use crate::core::types::Account;
+use error::CsvError;
 use types::*;
 
 /// Order of the accounts in the printed summary.
@@ -28,9 +29,14 @@ pub struct CsvProvider {
 
 impl CsvProvider {
   /// Loads transactions from given path into internal *processor*.
-  pub fn load_from_path(&mut self, path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
-    // Prepare buffered reader.
-    let file = File::open(path)?;
+  pub fn load_from_path(&mut self, path: impl AsRef<Path>) -> Result<(), CsvError> {
+    // Prepare buffered reader. The path goes into the error, so the user
+    // learns which file could not be opened.
+    let path = path.as_ref();
+    let file = File::open(path).map_err(|source| CsvError::OpenFailed {
+      path: path.to_path_buf(),
+      source,
+    })?;
     let buffered_file_reader = BufReader::new(file);
 
     // Delegate parsing to generic *load* method.
@@ -40,7 +46,7 @@ impl CsvProvider {
   /// Loads transactions from reader into internal *processor*.
   /// Only severe errors are returned; in case of invalid rows, they are
   /// simply ignored and error is logged to stderr.
-  pub fn load(&mut self, reader: impl Read) -> Result<(), Box<dyn Error>> {
+  pub fn load(&mut self, reader: impl Read) -> Result<(), CsvError> {
     // Read CSV data with buffered reader.
     // We use following config:
     // - first row is header,
@@ -72,7 +78,7 @@ impl CsvProvider {
   /// Prints summary (to stdout) of each account in CSV format.
   /// You can choose between sorted or raw order of accounts.
   /// Should be called after *load()* to see results.
-  pub fn print_accounts_summary(&self, order: SummaryOrder) -> Result<(), Box<dyn Error>> {
+  pub fn print_accounts_summary(&self, order: SummaryOrder) -> Result<(), CsvError> {
     // Create CSV writer for stdout.
     let mut wtr = csv::Writer::from_writer(io::stdout());
 
@@ -94,7 +100,7 @@ impl CsvProvider {
     }
 
     // Flush stdout.
-    wtr.flush()?;
+    wtr.flush().map_err(|source| CsvError::WriteFailed { source })?;
 
     Ok(())
   }
@@ -104,7 +110,7 @@ impl CsvProvider {
   fn write_account(
     wtr: &mut csv::Writer<io::Stdout>,
     account: &Account,
-  ) -> Result<(), Box<dyn Error>> {
+  ) -> Result<(), CsvError> {
     let acc_row = AccountRow::new(account)?;
     if let Err(e) = wtr.serialize(acc_row) {
       eprintln!("Unable to serialize account: {e}");

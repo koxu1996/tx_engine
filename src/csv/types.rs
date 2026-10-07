@@ -1,10 +1,10 @@
-use std::error::Error;
-
 use rust_decimal::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::core::error::EngineError;
 use crate::core::types::*;
+use crate::csv::error::CsvError;
 
 /// Transaction type, as it appears in the *type* column.
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -41,7 +41,7 @@ impl CsvTransaction {
 }
 
 impl TryFrom<TransactionRow> for CsvTransaction {
-  type Error = Box<dyn Error>;
+  type Error = CsvError;
 
   /// Converts row into valid *Transaction*, which is returned afterwards.
   /// In case of any problem Error is returned.
@@ -58,7 +58,7 @@ impl TryFrom<TransactionRow> for CsvTransaction {
         T::Withdrawal(WithdrawalTx::new(row.client, row.tx, amount))
       }
       (RowType::Deposit | RowType::Withdrawal, None) => {
-        return Err("Malformed data: deposit/withdrawal must have amount field.".into());
+        return Err(CsvError::MissingAmount);
       }
       (RowType::Dispute, None) => T::Dispute(DisputeTx {
         client: row.client,
@@ -73,7 +73,7 @@ impl TryFrom<TransactionRow> for CsvTransaction {
         ref_tx: row.tx,
       }),
       (RowType::Dispute | RowType::Resolve | RowType::Chargeback, Some(_)) => {
-        return Err("Malformed data: dispute/resolve/chargeback cannot have amount field.".into());
+        return Err(CsvError::UnexpectedAmount);
       }
     };
 
@@ -98,7 +98,7 @@ pub struct AccountRow {
 
 impl AccountRow {
   /// Creates CSV row from existing *Account*. No error is expected here.
-  pub fn new(account: &Account) -> Result<Self, Box<dyn Error>> {
+  pub fn new(account: &Account) -> Result<Self, EngineError> {
     Ok(Self {
       client: account.id,
       available: account.amount_available,

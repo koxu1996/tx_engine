@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::error::Error;
 
+use crate::core::error::EngineError;
 use crate::core::types::*;
 
 /// Common storage for accounts, transactions and their disputes.
@@ -22,11 +22,11 @@ impl AccountsStorage {
   }
 
   /// Gets account from storage - mutable version.
-  pub fn get_mut(&mut self, id: ClientId) -> Result<&mut Account, Box<dyn Error>> {
+  pub fn get_mut(&mut self, id: ClientId) -> Result<&mut Account, EngineError> {
     self
       .0
       .get_mut(&id)
-      .ok_or_else(|| "Account not found".into())
+      .ok_or(EngineError::AccountNotFound { client: id })
   }
 
   /// Gets account from storage, or creates an empty one when the client
@@ -63,17 +63,17 @@ impl TransactionsStorage {
   }
 
   /// Gets transaction from storage.
-  pub fn get(&self, id: TransactionId) -> Result<&Transaction, Box<dyn Error>> {
+  pub fn get(&self, id: TransactionId) -> Result<&Transaction, EngineError> {
     self
       .0
       .get(&id)
-      .ok_or_else(|| "Transaction not found".into())
+      .ok_or(EngineError::TransactionNotFound { tx: id })
   }
 
   /// Checks if given ID is unique among already existing transactions
-  pub fn assert_unique_id(&self, id: TransactionId) -> Result<(), Box<dyn Error>> {
+  pub fn assert_unique_id(&self, id: TransactionId) -> Result<(), EngineError> {
     if self.0.contains_key(&id) {
-      return Err("Transaction ID is not unique".into());
+      return Err(EngineError::TransactionNotUnique { tx: id });
     }
     Ok(())
   }
@@ -97,10 +97,10 @@ impl DisputesStorage {
   }
 
   /// Gets dispute from storage - mutable version.
-  pub fn get_mut(&mut self, id: TransactionId) -> Result<&mut DisputeStatus, Box<dyn Error>> {
+  pub fn get_mut(&mut self, id: TransactionId) -> Result<&mut DisputeStatus, EngineError> {
     self
       .0
       .get_mut(&id)
-      .ok_or_else(|| "Dispute not found".into())
+      .ok_or(EngineError::DisputeNotFound { tx: id })
   }
 }

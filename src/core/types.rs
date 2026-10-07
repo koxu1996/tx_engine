@@ -1,6 +1,6 @@
-use std::error::Error;
-
 use rust_decimal::prelude::*;
+
+use crate::core::error::EngineError;
 
 /// Client ID
 pub type ClientId = u16;
@@ -44,47 +44,47 @@ impl Account {
   /// Calculates total amount of money,
   /// which is sum of available and held.
   /// Returns error when the sum does not fit in **Decimal**.
-  pub fn amount_total(&self) -> Result<Decimal, Box<dyn Error>> {
+  pub fn amount_total(&self) -> Result<Decimal, EngineError> {
     self
       .amount_available
       .checked_add(self.amount_held)
-      .ok_or_else(|| "Total amount overflowed".into())
+      .ok_or(EngineError::TotalOverflowed { client: self.id })
   }
 
   /// Increases available amount, as a result of deposit.
   /// Returns error when the result does not fit in **Decimal**.
-  pub fn deposit(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
+  pub fn deposit(&mut self, amount: TxAmount) -> Result<(), EngineError> {
     self.amount_available = self
       .amount_available
       .checked_add(amount.get())
-      .ok_or_else(|| Box::<dyn Error>::from("Available amount overflowed"))?;
+      .ok_or(EngineError::AvailableOverflowed { client: self.id })?;
 
     Ok(())
   }
 
   /// Decreases available amount, as a result of withdrawal.
   /// Returns error when the result does not fit in **Decimal**.
-  pub fn withdraw(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
+  pub fn withdraw(&mut self, amount: TxAmount) -> Result<(), EngineError> {
     self.amount_available = self
       .amount_available
       .checked_sub(amount.get())
-      .ok_or_else(|| Box::<dyn Error>::from("Available amount overflowed"))?;
+      .ok_or(EngineError::AvailableOverflowed { client: self.id })?;
 
     Ok(())
   }
 
   /// Moves amount from available to held, as a result of dispute.
   /// Both amounts change together, or neither of them changes.
-  pub fn hold(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
+  pub fn hold(&mut self, amount: TxAmount) -> Result<(), EngineError> {
     // Calculate both amounts first.
     let available = self
       .amount_available
       .checked_sub(amount.get())
-      .ok_or_else(|| Box::<dyn Error>::from("Available amount overflowed"))?;
+      .ok_or(EngineError::AvailableOverflowed { client: self.id })?;
     let held = self
       .amount_held
       .checked_add(amount.get())
-      .ok_or_else(|| Box::<dyn Error>::from("Held amount overflowed"))?;
+      .ok_or(EngineError::HeldOverflowed { client: self.id })?;
 
     self.amount_available = available;
     self.amount_held = held;
@@ -94,15 +94,15 @@ impl Account {
 
   /// Moves amount from held back to available, as a result of resolve.
   /// Both amounts change together, or neither of them changes.
-  pub fn release(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
+  pub fn release(&mut self, amount: TxAmount) -> Result<(), EngineError> {
     let available = self
       .amount_available
       .checked_add(amount.get())
-      .ok_or_else(|| Box::<dyn Error>::from("Available amount overflowed"))?;
+      .ok_or(EngineError::AvailableOverflowed { client: self.id })?;
     let held = self
       .amount_held
       .checked_sub(amount.get())
-      .ok_or_else(|| Box::<dyn Error>::from("Held amount overflowed"))?;
+      .ok_or(EngineError::HeldOverflowed { client: self.id })?;
 
     self.amount_available = available;
     self.amount_held = held;
@@ -112,11 +112,11 @@ impl Account {
 
   /// Decreases held amount, as a result of chargeback.
   /// The money leaves the account, so it does not return to available.
-  pub fn withdraw_held(&mut self, amount: TxAmount) -> Result<(), Box<dyn Error>> {
+  pub fn withdraw_held(&mut self, amount: TxAmount) -> Result<(), EngineError> {
     self.amount_held = self
       .amount_held
       .checked_sub(amount.get())
-      .ok_or_else(|| Box::<dyn Error>::from("Held amount overflowed"))?;
+      .ok_or(EngineError::HeldOverflowed { client: self.id })?;
 
     Ok(())
   }
@@ -140,9 +140,9 @@ pub struct TxAmount(Decimal); // use Decimal to avoid round-off
 impl TxAmount {
   /// Constructs new *TxAmount*.
   /// Returns error when the value is not above zero.
-  pub fn new(value: Decimal) -> Result<Self, Box<dyn Error>> {
+  pub fn new(value: Decimal) -> Result<Self, EngineError> {
     if value <= Decimal::ZERO {
-      return Err("Amount must be greater than 0".into());
+      return Err(EngineError::AmountNotPositive);
     }
 
     Ok(Self(value))
