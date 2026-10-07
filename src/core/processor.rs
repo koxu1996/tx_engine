@@ -91,10 +91,10 @@ impl BalanceProcessor {
       return Err("Mismatched client id!".into());
     }
     // A dispute refers to a deposit, and takes the deposited amount
-    let ref_tx_amount = match ref_tx {
-      Transaction::Deposit(deposit) => deposit.amount,
-      _ => return Err("Cannot dispute transaction different than deposit".into()),
+    let Transaction::Deposit(ref_deposit) = ref_tx else {
+      return Err("Cannot dispute transaction different than deposit".into());
     };
+    let ref_tx_amount = ref_deposit.amount;
     if self.storage.disputes.get(&dispute.ref_tx).is_ok() {
       return Err("Dispute already created/processed!".into());
     }
@@ -132,10 +132,10 @@ impl BalanceProcessor {
       return Err("Mismatched client id!".into());
     }
     // A resolve refers to a disputed deposit, and takes the deposited amount
-    let ref_tx_amount = match ref_tx {
-      Transaction::Deposit(deposit) => deposit.amount,
-      _ => return Err("Cannot resolve transaction different than deposit".into()),
+    let Transaction::Deposit(ref_deposit) = ref_tx else {
+      return Err("Cannot resolve transaction different than deposit".into());
     };
+    let ref_tx_amount = ref_deposit.amount;
     let dispute = self.storage.disputes.get_mut(&resolve.ref_tx)?;
     if *dispute != DisputeStatus::Started {
       return Err("Dispute has no 'started' state!".into());
@@ -171,10 +171,10 @@ impl BalanceProcessor {
       return Err("Mismatched client id!".into());
     }
     // A chargeback refers to a disputed deposit, and takes the deposited amount
-    let ref_tx_amount = match ref_tx {
-      Transaction::Deposit(deposit) => deposit.amount,
-      _ => return Err("Cannot charge back transaction different than deposit".into()),
+    let Transaction::Deposit(ref_deposit) = ref_tx else {
+      return Err("Cannot resolve transaction different than deposit".into());
     };
+    let ref_tx_amount = ref_deposit.amount;
     let dispute = self.storage.disputes.get_mut(&chargeback.ref_tx)?;
     if *dispute != DisputeStatus::Started {
       return Err("Dispute has no 'started' state!".into());
