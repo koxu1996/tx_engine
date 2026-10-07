@@ -3,8 +3,8 @@ pub mod types;
 use std::error::Error;
 use std::fs::File;
 use std::io;
-use std::io::BufReader;
-use std::path::PathBuf;
+use std::io::{BufReader, Read};
+use std::path::Path;
 
 use csv::ReaderBuilder;
 
@@ -25,22 +25,30 @@ impl CsvProvider {
     }
   }
 
-  /// Loads transactions from file into internal *processor*.
+  /// Loads transactions from given path into internal *processor*.
+  pub fn load_from_path(&mut self, path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
+    // Prepare buffered reader.
+    let file = File::open(path)?;
+    let buffered_file_reader = BufReader::new(file);
+
+    // Delegate parsing to generic *load* method.
+    self.load(buffered_file_reader)
+  }
+
+  /// Loads transactions from reader into internal *processor*.
   /// Only severe errors are returned; in case of invalid rows, they are
   /// simply ignored and error is logged to stderr.
-  pub fn load(&mut self, path: PathBuf) -> Result<(), Box<dyn Error>> {
-    // Open file with CSV buffered reader.
+  pub fn load(&mut self, reader: impl Read) -> Result<(), Box<dyn Error>> {
+    // Read CSV data with buffered reader.
     // We use following config:
     // - first row is header,
     // - last columns might be skipped,
     // - trim all whitespaces.
-    let file = File::open(path)?;
-    let buffered_file_reader = BufReader::new(file);
     let mut rdr = ReaderBuilder::new()
       .has_headers(true)
       .flexible(true)
       .trim(csv::Trim::All)
-      .from_reader(buffered_file_reader);
+      .from_reader(reader);
 
     // For every line in CSV perform deserialization into *Row*,
     // then convert it to *Transaction* and finally feed into *processor*.
