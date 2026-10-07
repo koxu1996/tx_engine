@@ -32,7 +32,7 @@ impl BalanceProcessor {
     };
 
     // Effects
-    account.amount_available += amount;
+    account.deposit(amount)?;
     self.storage.transactions.add(tx);
 
     Ok(())
@@ -63,7 +63,7 @@ impl BalanceProcessor {
     }
 
     // Effects
-    account.amount_available -= amount;
+    account.withdraw(amount)?;
     self.storage.transactions.add(tx);
 
     Ok(())
@@ -100,8 +100,7 @@ impl BalanceProcessor {
     let account = self.storage.accounts.get_mut(&tx.client)?;
 
     // Effects
-    account.amount_available -= ref_tx_amount;
-    account.amount_held += ref_tx_amount;
+    account.hold(ref_tx_amount)?;
     self.storage.disputes.add(ref_tx.tx, DisputeStatus::Started);
 
     Ok(())
@@ -135,8 +134,7 @@ impl BalanceProcessor {
     let account = self.storage.accounts.get_mut(&tx.client)?;
 
     // Effects
-    account.amount_available += ref_tx_amount;
-    account.amount_held -= ref_tx_amount;
+    account.release(ref_tx_amount)?;
     *dispute = DisputeStatus::Resolved;
 
     Ok(())
@@ -170,7 +168,7 @@ impl BalanceProcessor {
     let account = self.storage.accounts.get_mut(&tx.client)?;
 
     // Effects
-    account.amount_held -= ref_tx_amount;
+    account.withdraw_held(ref_tx_amount)?;
     account.is_locked = true;
     *dispute = DisputeStatus::Chargeback;
 
