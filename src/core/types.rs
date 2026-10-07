@@ -155,10 +155,10 @@ impl Transaction {
     amount: Option<Decimal>,
   ) -> Result<Self, Box<dyn Error>> {
     // Validate amount: must be above 0.0.
-    if let Some(x) = amount {
-      if x <= Decimal::ZERO {
-        return Err("Amount must be greater than 0".into());
-      }
+    if let Some(x) = amount
+      && x <= Decimal::ZERO
+    {
+      return Err("Amount must be greater than 0".into());
     }
 
     // Reject malformed data: when dispute/resolve/chargeback has amount field.
