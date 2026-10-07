@@ -31,11 +31,7 @@ impl AccountsStorage {
 
   /// Gets account from storage - mutable version.
   pub fn get_mut(&mut self, id: &ClientId) -> Result<&mut Account, Box<dyn Error>> {
-    let account = match self.0.get_mut(id) {
-      None => return Err("Account not found".into()),
-      Some(x) => x,
-    };
-    Ok(account)
+    self.0.get_mut(id).ok_or_else(|| "Account not found".into())
   }
 
   /// Removes account from storage.
@@ -72,11 +68,7 @@ impl TransactionsStorage {
 
   /// Gets transaction from storage.
   pub fn get(&self, id: &TransactionId) -> Result<&Transaction, Box<dyn Error>> {
-    let tx = match self.0.get(id) {
-      None => return Err("Transaction not found".into()),
-      Some(x) => x,
-    };
-    Ok(tx)
+    self.0.get(id).ok_or_else(|| "Transaction not found".into())
   }
 
   /// Checks if given ID is unique among already existing transactions
@@ -111,10 +103,6 @@ impl DisputesStorage {
 
   /// Gets transaction from storage - mutable version.
   pub fn get_mut(&mut self, id: &TransactionId) -> Result<&mut DisputeStatus, Box<dyn Error>> {
-    let dispute = match self.0.get_mut(id) {
-      None => return Err("Dispute not found".into()),
-      Some(x) => x,
-    };
-    Ok(dispute)
+    self.0.get_mut(id).ok_or_else(|| "Dispute not found".into())
   }
 }
