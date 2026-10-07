@@ -47,38 +47,6 @@ pub enum DisputeStatus {
   Chargeback,
 }
 
-#[derive(Debug)]
-pub struct Dispute {
-  /// Current status of dispute
-  status: DisputeStatus,
-  _private: (),
-}
-
-impl Dispute {
-  /// Constructs new *Dispute*.
-  pub fn new() -> Self {
-    Self {
-      status: DisputeStatus::Started,
-      _private: (),
-    }
-  }
-
-  /// Updates dispute status to **Resolved**.
-  pub fn mark_resolved(&mut self) {
-    self.status = DisputeStatus::Resolved;
-  }
-
-  /// Updates dispute status to **Chargeback**.
-  pub fn mark_chargeback(&mut self) {
-    self.status = DisputeStatus::Resolved;
-  }
-
-  /// Getter for status field.
-  pub fn get_status(&self) -> &DisputeStatus {
-    &self.status
-  }
-}
-
 /// Transaction ID
 pub type TransactionId = u32;
 

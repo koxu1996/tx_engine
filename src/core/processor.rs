@@ -102,7 +102,7 @@ impl BalanceProcessor {
     // Effects
     account.amount_available -= ref_tx_amount;
     account.amount_held += ref_tx_amount;
-    self.storage.disputes.add(ref_tx.tx, Dispute::new());
+    self.storage.disputes.add(ref_tx.tx, DisputeStatus::Started);
 
     Ok(())
   }
@@ -129,7 +129,7 @@ impl BalanceProcessor {
       None => return Err("Missing amount!".into()),
     };
     let dispute = self.storage.disputes.get_mut(&tx.tx)?;
-    if *dispute.get_status() != DisputeStatus::Started {
+    if *dispute != DisputeStatus::Started {
       return Err("Dispute has no 'started' state!".into());
     }
     let account = self.storage.accounts.get_mut(&tx.client)?;
@@ -137,7 +137,7 @@ impl BalanceProcessor {
     // Effects
     account.amount_available += ref_tx_amount;
     account.amount_held -= ref_tx_amount;
-    dispute.mark_resolved();
+    *dispute = DisputeStatus::Resolved;
 
     Ok(())
   }
@@ -164,7 +164,7 @@ impl BalanceProcessor {
       None => return Err("Missing amount!".into()),
     };
     let dispute = self.storage.disputes.get_mut(&tx.tx)?;
-    if *dispute.get_status() != DisputeStatus::Started {
+    if *dispute != DisputeStatus::Started {
       return Err("Dispute has no 'started' state!".into());
     }
     let account = self.storage.accounts.get_mut(&tx.client)?;
@@ -172,7 +172,7 @@ impl BalanceProcessor {
     // Effects
     account.amount_held -= ref_tx_amount;
     account.is_locked = true;
-    dispute.mark_chargeback();
+    *dispute = DisputeStatus::Chargeback;
 
     Ok(())
   }

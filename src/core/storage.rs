@@ -80,20 +80,20 @@ impl TransactionsStorage {
   }
 }
 
-/// Map holding transaction Id and corresponding *Dispute*.
+/// Map holding transaction Id and corresponding *DisputeStatus*.
 #[derive(Default)]
-pub struct DisputesStorage(HashMap<TransactionId, Dispute>);
+pub struct DisputesStorage(HashMap<TransactionId, DisputeStatus>);
 
 impl DisputesStorage {
   /// Adds dispute to storage.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
-  pub fn add(&mut self, id: TransactionId, dispute: Dispute) {
+  pub fn add(&mut self, id: TransactionId, dispute: DisputeStatus) {
     self.0.insert(id, dispute);
   }
 
   /// Gets dispute from storage.
-  pub fn get(&self, id: &TransactionId) -> Result<&Dispute, Box<dyn Error>> {
+  pub fn get(&self, id: &TransactionId) -> Result<&DisputeStatus, Box<dyn Error>> {
     let dispute = match self.0.get(id) {
       None => return Err("Dispute not found".into()),
       Some(x) => x,
@@ -102,7 +102,7 @@ impl DisputesStorage {
   }
 
   /// Gets transaction from storage - mutable version.
-  pub fn get_mut(&mut self, id: &TransactionId) -> Result<&mut Dispute, Box<dyn Error>> {
+  pub fn get_mut(&mut self, id: &TransactionId) -> Result<&mut DisputeStatus, Box<dyn Error>> {
     let dispute = match self.0.get_mut(id) {
       None => return Err("Dispute not found".into()),
       Some(x) => x,
