@@ -121,15 +121,12 @@ impl Transaction {
     }
 
     // Reject malformed data: when dispute/resolve/chargeback has amount field.
-    match &kind {
-      TransactionType::Dispute | TransactionType::Resolve | TransactionType::Chargeback => {
-        if let Some(_) = amount {
-          return Err(
-            "Malformed data: dispute/resolve/chargeback cannot have amount field.".into(),
-          );
-        }
-      }
-      _ => {}
+    if matches!(
+      kind,
+      TransactionType::Dispute | TransactionType::Resolve | TransactionType::Chargeback
+    ) && amount.is_some()
+    {
+      return Err("Malformed data: dispute/resolve/chargeback cannot have amount field.".into());
     }
 
     Ok(Self {

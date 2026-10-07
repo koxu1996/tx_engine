@@ -94,7 +94,7 @@ impl BalanceProcessor {
       Some(x) => x,
       None => return Err("Missing associated amount!".into()),
     };
-    if let Ok(_) = self.storage.disputes.get(&tx.tx) {
+    if self.storage.disputes.get(&tx.tx).is_ok() {
       return Err("Dispute already created/processed!".into());
     }
     let account = self.storage.accounts.get_mut(&tx.client)?;
@@ -200,10 +200,8 @@ impl BalanceProcessor {
     };
 
     // Revert client insert in case of processing error
-    if let Err(_) = process_result {
-      if is_new_client {
-        self.storage.accounts.remove(&client_id);
-      }
+    if process_result.is_err() && is_new_client {
+      self.storage.accounts.remove(&client_id);
     }
 
     process_result

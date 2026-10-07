@@ -73,9 +73,9 @@ impl TransactionsStorage {
 
   /// Checks if given ID is unique among already existing transactions
   pub fn assert_unique_id(&self, id: &TransactionId) -> Result<(), Box<dyn Error>> {
-    if let Some(_) = self.0.get(id) {
+    if self.0.contains_key(id) {
       return Err("Transaction ID is not unique".into());
-    };
+    }
     Ok(())
   }
 }
