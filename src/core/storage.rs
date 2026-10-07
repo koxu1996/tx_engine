@@ -20,7 +20,7 @@ impl AccountsStorage {
   /// *Caution:* make sure account id is unique, otherwise
   /// existing data will be overwritten.
   pub fn add(&mut self, account: Account) {
-    let id = account.id.clone();
+    let id = account.id;
     self.0.insert(id, account);
   }
 
@@ -58,7 +58,7 @@ impl TransactionsStorage {
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
   pub fn add(&mut self, transaction: Transaction) {
-    let id = transaction.tx.clone();
+    let id = transaction.tx;
     self.0.insert(id, transaction);
   }
 
@@ -88,8 +88,8 @@ impl DisputesStorage {
   /// Adds dispute to storage.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
-  pub fn add(&mut self, id: &TransactionId, dispute: Dispute) {
-    self.0.insert(id.clone(), dispute);
+  pub fn add(&mut self, id: TransactionId, dispute: Dispute) {
+    self.0.insert(id, dispute);
   }
 
   /// Gets dispute from storage.

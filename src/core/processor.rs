@@ -102,7 +102,7 @@ impl BalanceProcessor {
     // Effects
     account.amount_available -= ref_tx_amount;
     account.amount_held += ref_tx_amount;
-    self.storage.disputes.add(&ref_tx.tx, Dispute::new());
+    self.storage.disputes.add(ref_tx.tx, Dispute::new());
 
     Ok(())
   }
@@ -182,12 +182,12 @@ impl BalanceProcessor {
   /// error during execution, storage will be restored to previous state.
   pub fn feed_tx(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
     // Copy client ID, before losing ownership
-    let client_id = tx.client.clone();
+    let client_id = tx.client;
 
     // Insert client into store if not exists
     let is_new_client = !self.storage.accounts.has(&tx.client);
     if is_new_client {
-      self.storage.accounts.add(Account::new(tx.client.clone()));
+      self.storage.accounts.add(Account::new(tx.client));
     }
 
     // Process transaction
