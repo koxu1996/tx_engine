@@ -33,9 +33,12 @@ impl Account {
 
   /// Calculates total amount of money,
   /// which is sum of available and held.
-  pub fn amount_total(&self) -> Decimal {
-    let total = self.amount_available + self.amount_held;
-    total
+  /// Returns error when the sum does not fit in **Decimal**.
+  pub fn amount_total(&self) -> Result<Decimal, Box<dyn Error>> {
+    self
+      .amount_available
+      .checked_add(self.amount_held)
+      .ok_or_else(|| "Total amount overflowed".into())
   }
 }
 
@@ -104,5 +107,21 @@ impl Transaction {
       amount,
       _private: (),
     })
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// The sum of two maximal amounts does not fit in a **Decimal**.
+  /// The function must return an error, and must not panic.
+  #[test]
+  fn amount_total_returns_error_on_overflow() {
+    let mut account = Account::new(1);
+    account.amount_available = Decimal::MAX;
+    account.amount_held = Decimal::MAX;
+
+    assert!(account.amount_total().is_err());
   }
 }
