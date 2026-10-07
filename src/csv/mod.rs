@@ -56,24 +56,21 @@ impl CsvProvider {
     // then convert it to *Transaction* and finally feed into *processor*.
     // **Note:** We pass transaction ownership to *processor*.
     for result in rdr.deserialize::<TransactionRow>() {
-      match result {
-        Ok(row) => {
-          let tx = Transaction::try_from(row);
-          match tx {
-            Err(e) => {
-              eprintln!("Error during convert: {:?}", e);
-            }
-            Ok(tx) => match self.processor.feed_tx(tx) {
-              Ok(_) => {}
-              Err(e) => {
-                eprintln!("Error during transaction processing: {:?}", e);
-              }
-            },
-          }
-        }
-        Err(e) => {
-          eprintln!("Skipping invalid row: {:?}", e);
-        }
+      // Skip invalid rows.
+      let Ok(row) = result.inspect_err(|e| eprintln!("Skipping invalid row: {e:?}")) else {
+        continue;
+      };
+
+      // Skip invalid tx.
+      let Ok(tx) =
+        Transaction::try_from(row).inspect_err(|e| eprintln!("Error during convert: {e:?}"))
+      else {
+        continue;
+      };
+
+      // Feed processor with tx.
+      if let Err(e) = self.processor.feed_tx(tx) {
+        eprintln!("Error during transaction processing: {e:?}");
       }
     }
 
