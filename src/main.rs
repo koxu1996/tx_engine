@@ -11,7 +11,7 @@ fn main() {
   // Load given CSV into transaction processor.
   let mut provider = csv::CsvProvider::default();
   provider.load_from_path(config.input).unwrap_or_else(|err| {
-    eprintln!("Unable to load CSV file: {}", err);
+    eprintln!("Unable to load CSV file: {err}");
     process::exit(1);
   });
 
@@ -19,7 +19,7 @@ fn main() {
   provider
     .print_accounts_summary(csv::SummaryOrder::Unsorted)
     .unwrap_or_else(|err| {
-      eprintln!("Unable to print accounts summary: {}", err);
+      eprintln!("Unable to print accounts summary: {err}");
       process::exit(1);
     });
 }

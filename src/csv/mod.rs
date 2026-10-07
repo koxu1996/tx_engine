@@ -57,20 +57,20 @@ impl CsvProvider {
     // **Note:** We pass transaction ownership to *processor*.
     for result in rdr.deserialize::<TransactionRow>() {
       // Skip invalid rows.
-      let Ok(row) = result.inspect_err(|e| eprintln!("Skipping invalid row: {e:?}")) else {
+      let Ok(row) = result.inspect_err(|e| eprintln!("Skipping invalid row: {e}")) else {
         continue;
       };
 
       // Skip invalid tx.
       let Ok(tx) =
-        Transaction::try_from(row).inspect_err(|e| eprintln!("Error during convert: {e:?}"))
+        Transaction::try_from(row).inspect_err(|e| eprintln!("Error during convert: {e}"))
       else {
         continue;
       };
 
       // Feed processor with tx.
       if let Err(e) = self.processor.feed_tx(tx) {
-        eprintln!("Error during transaction processing: {e:?}");
+        eprintln!("Error during transaction processing: {e}");
       }
     }
 
@@ -115,7 +115,7 @@ impl CsvProvider {
   ) -> Result<(), Box<dyn Error>> {
     let acc_row = AccountRow::new(account)?;
     if let Err(e) = wtr.serialize(acc_row) {
-      eprintln!("Unable to serialize account: {:?}", e);
+      eprintln!("Unable to serialize account: {e}");
     }
 
     Ok(())
