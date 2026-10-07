@@ -23,7 +23,7 @@ impl Account {
   /// Constructs new account.
   pub fn new(id: ClientId) -> Self {
     Account {
-      id: id,
+      id,
       amount_available: Decimal::new(0, 0),
       amount_held: Decimal::new(0, 0),
       is_locked: false,
