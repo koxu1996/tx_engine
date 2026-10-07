@@ -22,8 +22,8 @@ enum RowType {
 pub struct TransactionRow {
   #[serde(rename = "type")]
   type_: RowType,
-  client: u16,
-  tx: u32,
+  client: ClientId,
+  tx: TransactionId,
   #[serde(default, with = "rust_decimal::serde::str_option")]
   amount: Option<Decimal>,
 }
@@ -43,9 +43,11 @@ impl TryFrom<TransactionRow> for Transaction {
       (RowType::Deposit, Some(amount)) => {
         Self::Deposit(DepositTx::new(row.client, row.tx, TxAmount::new(amount)?))
       }
-      (RowType::Withdrawal, Some(amount)) => {
-        Self::Withdrawal(WithdrawalTx::new(row.client, row.tx, TxAmount::new(amount)?))
-      }
+      (RowType::Withdrawal, Some(amount)) => Self::Withdrawal(WithdrawalTx::new(
+        row.client,
+        row.tx,
+        TxAmount::new(amount)?,
+      )),
       (RowType::Deposit | RowType::Withdrawal, None) => {
         return Err("Malformed data: deposit/withdrawal must have amount field.".into());
       }
@@ -73,7 +75,7 @@ impl TryFrom<TransactionRow> for Transaction {
 #[derive(Debug, Serialize)]
 /// Model that represents CSV row with account details.
 pub struct AccountRow {
-  client: u16,
+  client: ClientId,
   /// For all three numbers we rely on rust_decimal feature to avoid
   /// default float variant that drops digits during serialization.
   #[serde(with = "rust_decimal::serde::str")]
