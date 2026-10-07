@@ -6,11 +6,22 @@ use serde::Serialize;
 
 use crate::core::types::*;
 
+/// Transaction type, as it appears in the *type* column.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum RowType {
+  Deposit,
+  Withdrawal,
+  Dispute,
+  Resolve,
+  Chargeback,
+}
+
 #[derive(Debug, Deserialize)]
 /// Model that represents CSV row with transaction details.
 pub struct TransactionRow {
   #[serde(rename = "type")]
-  type_: String,
+  type_: RowType,
   client: u16,
   tx: u32,
   amount: Option<String>,
@@ -33,32 +44,31 @@ impl TryFrom<TransactionRow> for Transaction {
     // Map the row onto a transaction. The kinds that move money need
     // the amount, and the other kinds must not carry one, so an invalid
     // pair is rejected here and cannot reach the engine.
-    let tx = match (row.type_.as_str(), amount) {
-      ("deposit", Some(amount)) => {
+    let tx = match (row.type_, amount) {
+      (RowType::Deposit, Some(amount)) => {
         Self::Deposit(DepositTx::new(row.client, row.tx, amount)?)
       }
-      ("withdrawal", Some(amount)) => {
+      (RowType::Withdrawal, Some(amount)) => {
         Self::Withdrawal(WithdrawalTx::new(row.client, row.tx, amount)?)
       }
-      ("deposit" | "withdrawal", None) => {
+      (RowType::Deposit | RowType::Withdrawal, None) => {
         return Err("Malformed data: deposit/withdrawal must have amount field.".into());
       }
-      ("dispute", None) => Self::Dispute(DisputeTx {
+      (RowType::Dispute, None) => Self::Dispute(DisputeTx {
         client: row.client,
         ref_tx: row.tx,
       }),
-      ("resolve", None) => Self::Resolve(ResolveTx {
+      (RowType::Resolve, None) => Self::Resolve(ResolveTx {
         client: row.client,
         ref_tx: row.tx,
       }),
-      ("chargeback", None) => Self::Chargeback(ChargebackTx {
+      (RowType::Chargeback, None) => Self::Chargeback(ChargebackTx {
         client: row.client,
         ref_tx: row.tx,
       }),
-      ("dispute" | "resolve" | "chargeback", Some(_)) => {
+      (RowType::Dispute | RowType::Resolve | RowType::Chargeback, Some(_)) => {
         return Err("Malformed data: dispute/resolve/chargeback cannot have amount field.".into());
       }
-      _ => return Err("Invalid transaction type".into()),
     };
 
     Ok(tx)
