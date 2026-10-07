@@ -16,17 +16,9 @@ pub struct Storage {
 pub struct AccountsStorage(HashMap<ClientId, Account>);
 
 impl AccountsStorage {
-  /// Adds client account to storage.
-  /// *Caution:* make sure account id is unique, otherwise
-  /// existing data will be overwritten.
-  pub fn add(&mut self, account: Account) {
-    let id = account.id;
-    self.0.insert(id, account);
-  }
-
-  /// Checks if given client is already stored.
-  pub fn has(&self, id: &ClientId) -> bool {
-    self.0.contains_key(id)
+  /// Gets account from storage, when the client is already known.
+  pub fn get(&self, id: &ClientId) -> Option<&Account> {
+    self.0.get(id)
   }
 
   /// Gets account from storage - mutable version.
@@ -34,9 +26,10 @@ impl AccountsStorage {
     self.0.get_mut(id).ok_or_else(|| "Account not found".into())
   }
 
-  /// Removes account from storage.
-  pub fn remove(&mut self, id: &ClientId) {
-    self.0.remove(id);
+  /// Gets account from storage, or creates an empty one when the client
+  /// is not known yet.
+  pub fn get_or_create(&mut self, id: ClientId) -> &mut Account {
+    self.0.entry(id).or_insert_with(|| Account::new(id))
   }
 
   /// Gets iterator over the stored accounts.

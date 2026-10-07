@@ -25,12 +25,17 @@ impl BalanceProcessor {
   fn process_deposit(&mut self, deposit: DepositTx) -> Result<(), Box<dyn Error>> {
     // Validation
     self.storage.transactions.assert_unique_id(&deposit.tx)?;
-    let account = self.storage.accounts.get_mut(&deposit.client)?;
-    if account.is_locked {
+    // The account may not exist yet, and an unknown client is not locked.
+    if let Some(account) = self.storage.accounts.get(&deposit.client)
+      && account.is_locked
+    {
       return Err("Account is locked!".into());
     }
 
     // Effects
+    // A deposit is the only kind that may create an account. Every check
+    // above is read-only, so a rejected deposit leaves no account behind.
+    let account = self.storage.accounts.get_or_create(deposit.client);
     account.deposit(deposit.amount)?;
     self.storage.transactions.add_deposit(deposit);
 
@@ -187,33 +192,14 @@ impl BalanceProcessor {
   }
 
   /// Feeds processor with transaction and updates clients accounts accordingly.
-  /// Creates new client if not already existing, but in case of any
-  /// error during execution, storage will be restored to previous state.
   pub fn feed_tx(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
-    // Copy client ID, before losing ownership
-    let client_id = tx.client();
-
-    // Insert client into store if not exists
-    let is_new_client = !self.storage.accounts.has(&client_id);
-    if is_new_client {
-      self.storage.accounts.add(Account::new(client_id));
-    }
-
-    // Process transaction
-    let process_result = match tx {
+    match tx {
       Transaction::Deposit(details) => self.process_deposit(details),
       Transaction::Withdrawal(details) => self.process_withdrawal(details),
       Transaction::Dispute(details) => self.process_dispute(details),
       Transaction::Resolve(details) => self.process_resolve(details),
       Transaction::Chargeback(details) => self.process_chargeback(details),
-    };
-
-    // Revert client insert in case of processing error
-    if process_result.is_err() && is_new_client {
-      self.storage.accounts.remove(&client_id);
     }
-
-    process_result
   }
 
   /// Gets iterator for account map.
