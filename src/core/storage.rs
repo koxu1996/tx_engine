@@ -94,14 +94,10 @@ impl DisputesStorage {
 
   /// Gets dispute from storage.
   pub fn get(&self, id: &TransactionId) -> Result<&DisputeStatus, Box<dyn Error>> {
-    let dispute = match self.0.get(id) {
-      None => return Err("Dispute not found".into()),
-      Some(x) => x,
-    };
-    Ok(dispute)
+    self.0.get(id).ok_or_else(|| "Dispute not found".into())
   }
 
-  /// Gets transaction from storage - mutable version.
+  /// Gets dispute from storage - mutable version.
   pub fn get_mut(&mut self, id: &TransactionId) -> Result<&mut DisputeStatus, Box<dyn Error>> {
     self.0.get_mut(id).ok_or_else(|| "Dispute not found".into())
   }
