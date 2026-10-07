@@ -23,13 +23,12 @@ impl TryFrom<TransactionRow> for Transaction {
   /// In case of any problem Error is returned.
   fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
     // Extract amount, when the row carries one.
-    let amount: Option<Decimal> = match &row.amount {
-      None => None,
-      Some(s) => match Decimal::from_str(s.as_str()) {
-        Ok(v) => Some(v),
-        Err(_) => return Err("Unable to parse amount".into()),
-      },
-    };
+    let amount = row
+      .amount
+      .as_deref()
+      .map(Decimal::from_str)
+      .transpose()
+      .map_err(|_| "Unable to parse amount")?;
 
     // Map the row onto a transaction. The kinds that move money need
     // the amount, and the other kinds must not carry one, so an invalid
