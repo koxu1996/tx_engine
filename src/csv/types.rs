@@ -24,7 +24,8 @@ pub struct TransactionRow {
   type_: RowType,
   client: u16,
   tx: u32,
-  amount: Option<String>,
+  #[serde(default, with = "rust_decimal::serde::str_option")]
+  amount: Option<Decimal>,
 }
 
 impl TryFrom<TransactionRow> for Transaction {
@@ -33,13 +34,7 @@ impl TryFrom<TransactionRow> for Transaction {
   /// Converts row into valid *Transaction*, which is returned afterwards.
   /// In case of any problem Error is returned.
   fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
-    // Extract amount, when the row carries one.
-    let amount = row
-      .amount
-      .as_deref()
-      .map(Decimal::from_str)
-      .transpose()
-      .map_err(|_| "Unable to parse amount")?;
+    let amount = row.amount;
 
     // Map the row onto a transaction. The kinds that move money need
     // the amount, and the other kinds must not carry one, so an invalid

@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 
 # Fixed-point decimal numbers, to avoid the round-off errors on the amounts.
-rust_decimal = { version = "1.43.0", default-features = false, features = ["serde"] }
+rust_decimal = { version = "1.43.0", default-features = false, features = ["serde", "serde-with-str"] }
 
 # Reader and writer for the CSV format.
 csv = { version = "1.4.0", default-features = false, features = [] }
