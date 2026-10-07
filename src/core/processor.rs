@@ -55,7 +55,7 @@ impl BalanceProcessor {
       return Err("Account is locked!".into());
     }
     let amount = match tx.amount {
-      None => return Err("Deposit transaction must have amount!".into()),
+      None => return Err("Withdrawal transaction must have amount!".into()),
       Some(x) => x,
     };
     if account.amount_available < amount {
