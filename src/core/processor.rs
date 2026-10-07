@@ -12,11 +12,15 @@ pub struct BalanceProcessor {
 
 impl BalanceProcessor {
   /// Processes deposit transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Transaction ID is unique.
   /// 2. Client account exists.
   /// 3. Account is not locked.
+  ///
   /// Effects:
+  ///
   /// 1. Client's available amount is increased.
   /// 2. Transaction is stored.
   fn process_deposit(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
@@ -39,12 +43,16 @@ impl BalanceProcessor {
   }
 
   /// Processes withdrawal transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Transaction ID is unique.
   /// 2. Client account exists.
   /// 3. Account is not locked.
   /// 4. Client has enough money available.
+  ///
   /// Effects:
+  ///
   /// 1. Client's available amount is decreased.
   /// 2. Transaction is stored.
   fn process_withdrawal(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
@@ -70,14 +78,18 @@ impl BalanceProcessor {
   }
 
   /// Processes dispute transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Referenced transaction exists.
   /// 2. Referenced transaction has matching client ID.
   /// 3. Referenced transaction is deposit.
   /// 4. Referenced transaction has amount associated.
   /// 5. Referenced transaction is not already disputed.
   /// 6. Client account exists.
+  ///
   /// Effects:
+  ///
   /// 1. Client's available amount is decreased.
   /// 2. Client's held amount is increased.
   /// 3. Dispute is stored.
@@ -107,13 +119,17 @@ impl BalanceProcessor {
   }
 
   /// Processes resolve transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Referenced transaction exists.
   /// 2. Referenced transaction has matching client ID.
-  /// 4. Referenced transaction has amount associated.
-  /// 5. Referenced transaction is under started dispute.
-  /// 6. Client account exists.
+  /// 3. Referenced transaction has amount associated.
+  /// 4. Referenced transaction is under started dispute.
+  /// 5. Client account exists.
+  ///
   /// Effects:
+  ///
   /// 1. Client's available amount is increased.
   /// 2. Client's held amount is decreased.
   /// 3. Dispute is marked as resolved.
@@ -141,16 +157,20 @@ impl BalanceProcessor {
   }
 
   /// Processes chargeback transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Referenced transaction exists.
   /// 2. Referenced transaction has matching client ID.
-  /// 4. Referenced transaction has amount associated.
-  /// 5. Referenced transaction is under started dispute.
-  /// 6. Client account exists.
+  /// 3. Referenced transaction has amount associated.
+  /// 4. Referenced transaction is under started dispute.
+  /// 5. Client account exists.
+  ///
   /// Effects:
+  ///
   /// 1. Client's held amount is decreased.
   /// 2. Client account is locked.
-  /// 2. Dispute is marked as chargeback-ed.
+  /// 3. Dispute is marked as chargeback-ed.
   fn process_chargeback(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
     // Validation
     let ref_tx = self.storage.transactions.get(&tx.tx)?;
