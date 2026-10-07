@@ -1,4 +1,3 @@
-use std::collections::hash_map;
 use std::error::Error;
 
 use crate::core::storage::*;
@@ -226,7 +225,7 @@ impl BalanceProcessor {
   }
 
   /// Gets iterator for account map.
-  pub fn get_accounts_iter(&self) -> hash_map::Iter<'_, u16, Account> {
+  pub fn get_accounts_iter(&self) -> impl Iterator<Item = (&ClientId, &Account)> {
     self.storage.accounts.raw().iter()
   }
 }
