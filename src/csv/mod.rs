@@ -3,7 +3,7 @@ pub mod types;
 
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, Read};
+use std::io::Read;
 use std::path::Path;
 
 use csv::ReaderBuilder;
@@ -30,17 +30,18 @@ pub struct CsvProvider {
 impl CsvProvider {
   /// Loads transactions from given path into internal *processor*.
   pub fn load_from_path(&mut self, path: impl AsRef<Path>) -> Result<(), CsvError> {
-    // Prepare buffered reader. The path goes into the error, so the user
-    // learns which file could not be opened.
+    // Open the file. The path goes into the error, so the user learns
+    // which file could not be opened.
+    // **Note:** the CSV reader buffers on its own, so the file needs no
+    // *BufReader* around it.
     let path = path.as_ref();
     let file = File::open(path).map_err(|source| CsvError::OpenFailed {
       path: path.to_path_buf(),
       source,
     })?;
-    let buffered_file_reader = BufReader::new(file);
 
     // Delegate parsing to generic *load* method.
-    self.load(buffered_file_reader)
+    self.load(file)
   }
 
   /// Loads transactions from reader into internal *processor*.
