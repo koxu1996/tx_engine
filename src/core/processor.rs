@@ -67,11 +67,11 @@ impl BalanceProcessor {
         client: withdrawal.client,
       });
     }
-    if account.amount_available < withdrawal.amount().get() {
+    if account.amount_available() < withdrawal.amount().get() {
       return Err(EngineError::NotSufficientFunds {
         client: withdrawal.client,
         requested: withdrawal.amount().get(),
-        available: account.amount_available,
+        available: account.amount_available(),
       });
     }
 

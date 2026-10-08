@@ -103,9 +103,9 @@ impl AccountRow {
   /// Creates CSV row from existing *Account*. No error is expected here.
   pub fn new(account: &Account) -> Result<Self, EngineError> {
     Ok(Self {
-      client: account.id,
-      available: account.amount_available,
-      held: account.amount_held,
+      client: account.id(),
+      available: account.amount_available(),
+      held: account.amount_held(),
       total: account.amount_total()?,
       locked: account.is_locked(),
     })

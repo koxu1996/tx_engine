@@ -9,11 +9,11 @@ pub type ClientId = u16;
 /// Structure that holds client accouts details.
 pub struct Account {
   /// Client ID.
-  pub id: ClientId,
+  id: ClientId,
   /// Available amount.
-  pub amount_available: Decimal,
+  amount_available: Decimal,
   /// Held amount (under dispute).
-  pub amount_held: Decimal,
+  amount_held: Decimal,
   /// Is account locked?
   is_locked: bool,
 }
@@ -27,6 +27,21 @@ impl Account {
       amount_held: Decimal::ZERO,
       is_locked: false,
     }
+  }
+
+  /// Client ID of the account.
+  pub fn id(&self) -> ClientId {
+    self.id
+  }
+
+  /// Amount that the client can use.
+  pub fn amount_available(&self) -> Decimal {
+    self.amount_available
+  }
+
+  /// Amount that a dispute holds.
+  pub fn amount_held(&self) -> Decimal {
+    self.amount_held
   }
 
   /// Is account locked?
