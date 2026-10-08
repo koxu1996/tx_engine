@@ -72,12 +72,9 @@ impl TransactionsStorage {
       .ok_or(EngineError::TransactionNotFound { tx: id })
   }
 
-  /// Checks if given ID is unique among already existing transactions
-  pub fn assert_unique_id(&self, id: TransactionId) -> Result<(), EngineError> {
-    if self.0.contains_key(&id) {
-      return Err(EngineError::TransactionNotUnique { tx: id });
-    }
-    Ok(())
+  /// Checks if a transaction with given ID is already stored.
+  pub fn has(&self, id: TransactionId) -> bool {
+    self.0.contains_key(&id)
   }
 }
 

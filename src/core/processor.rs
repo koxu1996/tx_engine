@@ -25,7 +25,9 @@ impl BalanceProcessor {
   /// 2. Transaction is stored.
   fn process_deposit(&mut self, deposit: DepositTx) -> Result<(), EngineError> {
     // Validation
-    self.storage.transactions.assert_unique_id(deposit.tx)?;
+    if self.storage.transactions.has(deposit.tx) {
+      return Err(EngineError::TransactionNotUnique { tx: deposit.tx });
+    }
     // The account may not exist yet, and an unknown client is not locked.
     if let Some(account) = self.storage.accounts.get(deposit.client)
       && account.is_locked()
@@ -60,7 +62,9 @@ impl BalanceProcessor {
   /// 2. Transaction is stored.
   fn process_withdrawal(&mut self, withdrawal: WithdrawalTx) -> Result<(), EngineError> {
     // Validation
-    self.storage.transactions.assert_unique_id(withdrawal.tx)?;
+    if self.storage.transactions.has(withdrawal.tx) {
+      return Err(EngineError::TransactionNotUnique { tx: withdrawal.tx });
+    }
     let account = self.storage.accounts.get_mut(withdrawal.client)?;
     if account.is_locked() {
       return Err(EngineError::AccountLocked {
@@ -211,7 +215,7 @@ impl BalanceProcessor {
     // Effects
     account.withdraw_held(ref_tx_amount)?;
     account.lock();
-    *dispute = DisputeStatus::Chargeback;
+    *dispute = DisputeStatus::ChargedBack;
 
     Ok(())
   }
@@ -227,8 +231,8 @@ impl BalanceProcessor {
     }
   }
 
-  /// Gets iterator for account map.
-  pub fn get_accounts_iter(&self) -> impl Iterator<Item = &Account> {
+  /// Gets iterator over the stored accounts.
+  pub fn accounts(&self) -> impl Iterator<Item = &Account> {
     self.storage.accounts.iter()
   }
 }

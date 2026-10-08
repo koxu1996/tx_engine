@@ -142,7 +142,7 @@ impl Account {
 pub enum DisputeStatus {
   Started,
   Resolved,
-  Chargeback,
+  ChargedBack,
 }
 
 /// Transaction ID
