@@ -2,8 +2,7 @@ pub mod error;
 pub mod types;
 
 use std::fs::File;
-use std::io;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 
 use csv::ReaderBuilder;
@@ -12,6 +11,13 @@ use crate::core::processor::BalanceProcessor;
 use crate::core::types::Account;
 use error::CsvError;
 use types::{AccountRow, CsvTransaction};
+
+/// Reports how many rows were accepted and how many were skipped.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LoadReport {
+  pub accepted: usize,
+  pub skipped: usize,
+}
 
 /// Order of the accounts in the printed summary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,7 +35,7 @@ pub struct CsvProvider {
 
 impl CsvProvider {
   /// Loads transactions from given path into internal *processor*.
-  pub fn load_from_path(&mut self, path: impl AsRef<Path>) -> Result<(), CsvError> {
+  pub fn load_from_path(&mut self, path: impl AsRef<Path>) -> Result<LoadReport, CsvError> {
     // Open the file. The path goes into the error, so the user learns
     // which file could not be opened.
     // **Note:** the CSV reader buffers on its own, so the file needs no
@@ -41,13 +47,13 @@ impl CsvProvider {
     })?;
 
     // Delegate parsing to generic *load* method.
-    self.load(file)
+    Ok(self.load(file))
   }
 
-  /// Loads transactions from reader into internal *processor*.
-  /// Only severe errors are returned; in case of invalid rows, they are
-  /// simply ignored and error is logged to stderr.
-  pub fn load(&mut self, reader: impl Read) -> Result<(), CsvError> {
+  /// Loads transactions from reader into internal *processor*, and reports
+  /// how many rows it accepted and skipped.
+  /// An invalid row never stops the load; it is logged to stderr instead.
+  pub fn load(&mut self, reader: impl Read) -> LoadReport {
     // Read CSV data with buffered reader.
     // We use following config:
     // - first row is header,
@@ -61,27 +67,37 @@ impl CsvProvider {
 
     // For every line in CSV perform deserialization into *Transaction*, via *TransactionRow*.
     // **Note:** We pass transaction ownership to *processor*.
+    let mut report = LoadReport::default();
     for result in rdr.deserialize::<CsvTransaction>() {
       // Skip invalid rows.
       let Ok(tx) = result.inspect_err(|e| eprintln!("Skipping invalid row: {e}")) else {
+        report.skipped += 1;
         continue;
       };
 
       // Feed processor with tx.
-      if let Err(e) = self.processor.feed_tx(tx.into_inner()) {
-        eprintln!("Error during transaction processing: {e}");
+      match self.processor.feed_tx(tx.into_inner()) {
+        Ok(()) => report.accepted += 1,
+        Err(e) => {
+          report.skipped += 1;
+          eprintln!("Error during transaction processing: {e}");
+        }
       }
     }
 
-    Ok(())
+    report
   }
 
-  /// Prints summary (to stdout) of each account in CSV format.
+  /// Writes summary of each account in CSV format into given *writer*.
   /// You can choose between sorted or raw order of accounts.
   /// Should be called after *load()* to see results.
-  pub fn print_accounts_summary(&self, order: SummaryOrder) -> Result<(), CsvError> {
-    // Create CSV writer for stdout.
-    let mut wtr = csv::Writer::from_writer(io::stdout());
+  pub fn write_accounts_summary(
+    &self,
+    order: SummaryOrder,
+    writer: impl Write,
+  ) -> Result<(), CsvError> {
+    // Create CSV writer over the given sink.
+    let mut wtr = csv::Writer::from_writer(writer);
 
     // Go through each account in processor and print its details.
     match order {
@@ -109,12 +125,10 @@ impl CsvProvider {
   }
 
   /// Writes single account as a CSV row.
-  /// Serialization error is logged to stderr, but not exits.
-  fn write_account(wtr: &mut csv::Writer<io::Stdout>, account: &Account) -> Result<(), CsvError> {
+  /// A failure stops the summary, because it means the sink is gone.
+  fn write_account<W: Write>(wtr: &mut csv::Writer<W>, account: &Account) -> Result<(), CsvError> {
     let acc_row = AccountRow::new(account)?;
-    if let Err(e) = wtr.serialize(acc_row) {
-      eprintln!("Unable to serialize account: {e}");
-    }
+    wtr.serialize(acc_row)?;
 
     Ok(())
   }

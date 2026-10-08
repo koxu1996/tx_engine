@@ -1,5 +1,6 @@
 mod cli;
 
+use std::io;
 use std::process::ExitCode;
 
 use tx_engine::csv;
@@ -21,10 +22,17 @@ fn run() -> Result<(), CsvError> {
 
   // Load given CSV into transaction processor.
   let mut provider = csv::CsvProvider::default();
-  provider.load_from_path(config.input)?;
+  let report = provider.load_from_path(config.input)?;
+  if report.skipped > 0 {
+    eprintln!(
+      "Skipped {} of {} rows.",
+      report.skipped,
+      report.accepted + report.skipped
+    );
+  }
 
   // Print summary of each client - balance, lock status.
-  provider.print_accounts_summary(csv::SummaryOrder::ByClientId)?;
+  provider.write_accounts_summary(csv::SummaryOrder::ByClientId, io::stdout())?;
 
   Ok(())
 }
