@@ -93,9 +93,8 @@ impl BalanceProcessor {
   /// 1. Referenced transaction exists.
   /// 2. Referenced transaction has matching client ID.
   /// 3. Referenced transaction is deposit.
-  /// 4. Referenced transaction has amount associated.
-  /// 5. Referenced transaction is not already disputed.
-  /// 6. Client account exists.
+  /// 4. Referenced transaction is not already disputed.
+  /// 5. Client account exists.
   ///
   /// Effects:
   ///
@@ -135,7 +134,7 @@ impl BalanceProcessor {
   ///
   /// 1. Referenced transaction exists.
   /// 2. Referenced transaction has matching client ID.
-  /// 3. Referenced transaction has amount associated.
+  /// 3. Referenced transaction is deposit.
   /// 4. Referenced transaction is under started dispute.
   /// 5. Client account exists.
   ///
@@ -178,7 +177,7 @@ impl BalanceProcessor {
   ///
   /// 1. Referenced transaction exists.
   /// 2. Referenced transaction has matching client ID.
-  /// 3. Referenced transaction has amount associated.
+  /// 3. Referenced transaction is deposit.
   /// 4. Referenced transaction is under started dispute.
   /// 5. Client account exists.
   ///
@@ -186,7 +185,7 @@ impl BalanceProcessor {
   ///
   /// 1. Client's held amount is decreased.
   /// 2. Client account is locked.
-  /// 3. Dispute is marked as chargeback-ed.
+  /// 3. Dispute is marked as charged back.
   fn process_chargeback(&mut self, chargeback: ChargebackTx) -> Result<(), EngineError> {
     // Validation
     let ref_tx = self.storage.transactions.get(chargeback.ref_tx)?;

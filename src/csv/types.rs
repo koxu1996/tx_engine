@@ -20,8 +20,8 @@ enum RowType {
   Chargeback,
 }
 
-#[derive(Debug, Deserialize)]
 /// Model that represents CSV row with transaction details.
+#[derive(Debug, Deserialize)]
 pub struct TransactionRow {
   #[serde(rename = "type")]
   type_: RowType,
@@ -84,8 +84,8 @@ impl TryFrom<TransactionRow> for CsvTransaction {
   }
 }
 
-#[derive(Debug, Serialize)]
 /// Model that represents CSV row with account details.
+#[derive(Debug, Serialize)]
 pub struct AccountRow {
   client: ClientId,
   /// For all three numbers we rely on rust_decimal feature to avoid

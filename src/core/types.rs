@@ -5,8 +5,8 @@ use crate::core::error::EngineError;
 /// Client ID
 pub type ClientId = u16;
 
-#[derive(Debug)]
 /// Structure that holds client accouts details.
+#[derive(Debug)]
 pub struct Account {
   /// Client ID.
   id: ClientId,
@@ -137,8 +137,8 @@ impl Account {
   }
 }
 
-#[derive(Debug, PartialEq, Eq)]
 /// Dispute status
+#[derive(Debug, PartialEq, Eq)]
 pub enum DisputeStatus {
   Started,
   Resolved,
