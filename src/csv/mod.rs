@@ -8,10 +8,10 @@ use std::path::Path;
 
 use csv::ReaderBuilder;
 
-use crate::core::processor::*;
+use crate::core::processor::BalanceProcessor;
 use crate::core::types::Account;
 use error::CsvError;
-use types::*;
+use types::{AccountRow, CsvTransaction};
 
 /// Order of the accounts in the printed summary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,17 +100,16 @@ impl CsvProvider {
     }
 
     // Flush stdout.
-    wtr.flush().map_err(|source| CsvError::WriteFailed { source })?;
+    wtr
+      .flush()
+      .map_err(|source| CsvError::WriteFailed { source })?;
 
     Ok(())
   }
 
   /// Writes single account as a CSV row.
   /// Serialization error is logged to stderr, but not exits.
-  fn write_account(
-    wtr: &mut csv::Writer<io::Stdout>,
-    account: &Account,
-  ) -> Result<(), CsvError> {
+  fn write_account(wtr: &mut csv::Writer<io::Stdout>, account: &Account) -> Result<(), CsvError> {
     let acc_row = AccountRow::new(account)?;
     if let Err(e) = wtr.serialize(acc_row) {
       eprintln!("Unable to serialize account: {e}");

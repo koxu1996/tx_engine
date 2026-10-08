@@ -1,9 +1,12 @@
-use rust_decimal::prelude::*;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::core::error::EngineError;
-use crate::core::types::*;
+use crate::core::types::{
+  Account, ChargebackTx, ClientId, DepositTx, DisputeTx, ResolveTx, Transaction, TransactionId,
+  TxAmount, WithdrawalTx,
+};
 use crate::csv::error::CsvError;
 
 /// Transaction type, as it appears in the *type* column.

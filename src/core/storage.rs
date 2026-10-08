@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::core::error::EngineError;
-use crate::core::types::*;
+use crate::core::types::{
+  Account, ClientId, DepositTx, DisputeStatus, Transaction, TransactionId, WithdrawalTx,
+};
 
 /// Common storage for accounts, transactions and their disputes.
 #[derive(Default)]

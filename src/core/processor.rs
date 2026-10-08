@@ -1,7 +1,8 @@
-
 use crate::core::error::EngineError;
-use crate::core::storage::*;
-use crate::core::types::*;
+use crate::core::storage::Storage;
+use crate::core::types::{
+  Account, ChargebackTx, DepositTx, DisputeStatus, DisputeTx, ResolveTx, Transaction, WithdrawalTx,
+};
 
 /// Balance processor, with internal storage for accounts/transactions/disputes.
 #[derive(Default)]
@@ -194,12 +195,16 @@ impl BalanceProcessor {
     }
     // A chargeback refers to a disputed deposit, and takes the deposited amount
     let Transaction::Deposit(ref_deposit) = ref_tx else {
-      return Err(EngineError::NotADeposit { tx: chargeback.ref_tx });
+      return Err(EngineError::NotADeposit {
+        tx: chargeback.ref_tx,
+      });
     };
     let ref_tx_amount = ref_deposit.amount();
     let dispute = self.storage.disputes.get_mut(chargeback.ref_tx)?;
     if *dispute != DisputeStatus::Started {
-      return Err(EngineError::DisputeNotStarted { tx: chargeback.ref_tx });
+      return Err(EngineError::DisputeNotStarted {
+        tx: chargeback.ref_tx,
+      });
     }
     let account = self.storage.accounts.get_mut(chargeback.client)?;
 

@@ -1,4 +1,4 @@
-use rust_decimal::prelude::*;
+use rust_decimal::Decimal;
 
 use crate::core::error::EngineError;
 
