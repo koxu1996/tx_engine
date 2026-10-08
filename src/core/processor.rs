@@ -40,8 +40,12 @@ impl BalanceProcessor {
     }
 
     // Effects
-    // A deposit is the only kind that may create an account. Every check
-    // above is read-only, so a rejected deposit leaves no account behind.
+    // A deposit is the only kind that may create an account, and it is the
+    // one handler whose first effect is not the fallible one. That is safe:
+    // a new account starts at zero, and a *TxAmount* is above zero and at
+    // most *Decimal::MAX*, so the deposit below cannot overflow a fresh
+    // account and cannot leave one behind. An existing account is not
+    // created here at all.
     let account = self.storage.accounts.get_or_create(deposit.client);
     account.deposit(deposit.amount())?;
     self.storage.transactions.add_deposit(deposit);
