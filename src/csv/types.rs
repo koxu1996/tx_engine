@@ -1,75 +1,113 @@
-use std::error::Error;
-
-use rust_decimal::prelude::*;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::core::types::*;
+use crate::core::error::EngineError;
+use crate::core::types::{
+  Account, ChargebackTx, ClientId, DepositTx, DisputeTx, ResolveTx, Transaction, TransactionId,
+  TxAmount, WithdrawalTx,
+};
+use crate::csv::error::CsvError;
 
-#[derive(Debug, Deserialize)]
-/// Model that represents CSV row with transaction details.
-pub struct TransactionRow {
-  #[serde(rename = "type")]
-  type_: String,
-  client: u16,
-  tx: u32,
-  amount: Option<String>,
+/// Transaction type, as it appears in the *type* column.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum RowType {
+  Deposit,
+  Withdrawal,
+  Dispute,
+  Resolve,
+  Chargeback,
 }
 
-impl TransactionRow {
-  /// Converts row into valid *Transaction*, which is returned afterwards.
-  /// In case of any problem Error is returned.
-  pub fn convert_to_tx(&self) -> Result<Transaction, Box<dyn Error>> {
-    // Validate transaction type.
-    let type_ = match self.type_.as_str() {
-      "deposit" => TransactionType::Deposit,
-      "withdrawal" => TransactionType::Withdrawal,
-      "dispute" => TransactionType::Dispute,
-      "resolve" => TransactionType::Resolve,
-      "chargeback" => TransactionType::Chargeback,
-      _ => return Err("Invalid transaction type".into()),
-    };
+/// Model that represents CSV row with transaction details.
+#[derive(Debug, Deserialize)]
+pub struct TransactionRow {
+  #[serde(rename = "type")]
+  type_: RowType,
+  client: ClientId,
+  tx: TransactionId,
+  #[serde(default, with = "rust_decimal::serde::str_option")]
+  amount: Option<Decimal>,
+}
 
-    // Extract amount.
-    let amount: Option<Decimal> = match &self.amount {
-      None => None,
-      Some(s) => {
-        let val = Decimal::from_str(s.as_str());
-        match val {
-          Ok(v) => Some(v),
-          Err(_) => {
-            return Err("Unable to parse amount".into());
-          }
-        }
-      }
-    };
+/// A *Transaction* as it arrives from a CSV row.
+#[derive(Debug, Deserialize)]
+#[serde(try_from = "TransactionRow")]
+pub struct CsvTransaction(Transaction);
 
-    // Construct new transaction from row details.
-    let tx = Transaction::new(type_, self.client, self.tx, amount)?;
-
-    Ok(tx)
+impl CsvTransaction {
+  /// The transaction that the row described.
+  pub fn into_inner(self) -> Transaction {
+    self.0
   }
 }
 
-#[derive(Debug, Serialize)]
+impl TryFrom<TransactionRow> for CsvTransaction {
+  type Error = CsvError;
+
+  /// Converts row into valid *Transaction*, which is returned afterwards.
+  /// In case of any problem Error is returned.
+  fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
+    use Transaction as T;
+
+    // Map amount field into a TxAmount, if present.
+    let amount = row.amount.map(TxAmount::new).transpose()?;
+
+    // Map the row onto a transaction.
+    let tx = match (row.type_, amount) {
+      (RowType::Deposit, Some(amount)) => T::Deposit(DepositTx::new(row.client, row.tx, amount)),
+      (RowType::Withdrawal, Some(amount)) => {
+        T::Withdrawal(WithdrawalTx::new(row.client, row.tx, amount))
+      }
+      (RowType::Deposit | RowType::Withdrawal, None) => {
+        return Err(CsvError::MissingAmount);
+      }
+      (RowType::Dispute, None) => T::Dispute(DisputeTx {
+        client: row.client,
+        ref_tx: row.tx,
+      }),
+      (RowType::Resolve, None) => T::Resolve(ResolveTx {
+        client: row.client,
+        ref_tx: row.tx,
+      }),
+      (RowType::Chargeback, None) => T::Chargeback(ChargebackTx {
+        client: row.client,
+        ref_tx: row.tx,
+      }),
+      (RowType::Dispute | RowType::Resolve | RowType::Chargeback, Some(_)) => {
+        return Err(CsvError::UnexpectedAmount);
+      }
+    };
+
+    Ok(Self(tx))
+  }
+}
+
 /// Model that represents CSV row with account details.
+#[derive(Debug, Serialize)]
 pub struct AccountRow {
-  client: u16,
+  client: ClientId,
+  /// For all three numbers we rely on rust_decimal feature to avoid
+  /// default float variant that drops digits during serialization.
+  #[serde(with = "rust_decimal::serde::str")]
   available: Decimal,
+  #[serde(with = "rust_decimal::serde::str")]
   held: Decimal,
+  #[serde(with = "rust_decimal::serde::str")]
   total: Decimal,
   locked: bool,
 }
 
 impl AccountRow {
-  /// Creates CSV row from existing *Account*. No error is expected here.
-  pub fn new(account: &Account) -> Result<Self, Box<dyn Error>> {
+  /// Creates CSV row from existing *Account*.
+  pub fn new(account: &Account) -> Result<Self, EngineError> {
     Ok(Self {
-      client: account.id,
-      available: account.amount_available,
-      held: account.amount_held,
-      total: (account.amount_available + account.amount_held),
-      locked: account.is_locked,
+      client: account.id(),
+      available: account.amount_available(),
+      held: account.amount_held(),
+      total: account.amount_total()?,
+      locked: account.is_locked(),
     })
   }
 }

@@ -1,222 +1,259 @@
-use std::collections::hash_map;
-use std::error::Error;
+use crate::core::error::EngineError;
+use crate::core::storage::Storage;
+use crate::core::types::{
+  Account, ChargebackTx, DepositTx, DisputeStatus, DisputeTx, ResolveTx, StoredTx, Transaction,
+  WithdrawalTx,
+};
 
-use crate::core::storage::*;
-use crate::core::types::*;
-
-/// Balance processor, with internal storage for accounts/transactions/disputes.
+/// Balance processor, with internal storage for accounts and transactions.
+/// The state of a dispute lives on the stored deposit that it refers to.
+#[derive(Default)]
 pub struct BalanceProcessor {
   storage: Storage,
 }
 
 impl BalanceProcessor {
-  /// Constructs new *BalanceProcessor*.
-  pub fn new() -> Self {
-    BalanceProcessor {
-      storage: Storage::new(),
-    }
-  }
-
   /// Processes deposit transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Transaction ID is unique.
   /// 2. Client account exists.
   /// 3. Account is not locked.
+  ///
   /// Effects:
+  ///
   /// 1. Client's available amount is increased.
   /// 2. Transaction is stored.
-  fn process_deposit(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
+  fn process_deposit(&mut self, deposit: DepositTx) -> Result<(), EngineError> {
     // Validation
-    self.storage.transactions.assert_unique_id(&tx.tx)?;
-    let account = self.storage.accounts.get_mut(&tx.client)?;
-    if account.is_locked {
-      return Err("Account is locked!".into());
+    if self.storage.transactions.has(deposit.tx) {
+      return Err(EngineError::TransactionNotUnique { tx: deposit.tx });
     }
-    let amount = match tx.amount {
-      None => return Err("Deposit transaction must have amount!".into()),
-      Some(x) => x,
-    };
+    // The account may not exist yet, and an unknown client is not locked.
+    if let Some(account) = self.storage.accounts.get(deposit.client)
+      && account.is_locked()
+    {
+      return Err(EngineError::AccountLocked {
+        client: deposit.client,
+      });
+    }
 
     // Effects
-    account.amount_available += amount;
-    self.storage.transactions.add(tx);
+    // A deposit is the only kind that may create an account, and it is the
+    // one handler whose first effect is not the fallible one. That is safe:
+    // a new account starts at zero, and a *TxAmount* is above zero and at
+    // most *Decimal::MAX*, so the deposit below cannot overflow a fresh
+    // account and cannot leave one behind. An existing account is not
+    // created here at all.
+    let account = self.storage.accounts.get_or_create(deposit.client);
+    account.deposit(deposit.amount())?;
+    self.storage.transactions.add_deposit(deposit);
 
     Ok(())
   }
 
   /// Processes withdrawal transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Transaction ID is unique.
   /// 2. Client account exists.
   /// 3. Account is not locked.
   /// 4. Client has enough money available.
+  ///
   /// Effects:
+  ///
   /// 1. Client's available amount is decreased.
   /// 2. Transaction is stored.
-  fn process_withdrawal(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
+  fn process_withdrawal(&mut self, withdrawal: WithdrawalTx) -> Result<(), EngineError> {
     // Validation
-    self.storage.transactions.assert_unique_id(&tx.tx)?;
-    let account = self.storage.accounts.get_mut(&tx.client)?;
-    if account.is_locked {
-      return Err("Account is locked!".into());
+    if self.storage.transactions.has(withdrawal.tx) {
+      return Err(EngineError::TransactionNotUnique { tx: withdrawal.tx });
     }
-    let amount = match tx.amount {
-      None => return Err("Deposit transaction must have amount!".into()),
-      Some(x) => x,
-    };
-    if account.amount_available < amount {
-      return Err("Not sufficient funds to make withdrawal".into());
+    let account = self.storage.accounts.get_mut(withdrawal.client)?;
+    if account.is_locked() {
+      return Err(EngineError::AccountLocked {
+        client: withdrawal.client,
+      });
+    }
+    if account.amount_available() < withdrawal.amount().get() {
+      return Err(EngineError::NotSufficientFunds {
+        client: withdrawal.client,
+        requested: withdrawal.amount().get(),
+        available: account.amount_available(),
+      });
     }
 
     // Effects
-    account.amount_available -= amount;
-    self.storage.transactions.add(tx);
+    account.withdraw(withdrawal.amount())?;
+    self.storage.transactions.add_withdrawal(withdrawal);
 
     Ok(())
   }
 
   /// Processes dispute transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Referenced transaction exists.
-  /// 2. Referenced transaction has matching client ID.
-  /// 3. Referenced transaction is deposit.
-  /// 4. Referenced transaction has amount associated.
-  /// 5. Referenced transaction is not already disputed.
-  /// 6. Client account exists.
+  /// 2. Referenced transaction is deposit.
+  /// 3. Referenced transaction has matching client ID.
+  /// 4. Referenced transaction is not already disputed.
+  /// 5. Client account exists.
+  ///
   /// Effects:
+  ///
   /// 1. Client's available amount is decreased.
   /// 2. Client's held amount is increased.
-  /// 3. Dispute is stored.
-  fn process_dispute(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
+  /// 3. Dispute is started on the stored deposit.
+  fn process_dispute(&mut self, dispute: DisputeTx) -> Result<(), EngineError> {
     // Validation
-    let ref_tx = self.storage.transactions.get(&tx.tx)?;
-    if ref_tx.client != tx.client {
-      return Err("Mismatched client id!".into());
-    }
-    if ref_tx.kind != TransactionType::Deposit {
-      return Err("Cannot dispute transaction different than deposit".into());
-    }
-    let ref_tx_amount = match ref_tx.amount {
-      Some(x) => x,
-      None => return Err("Missing associated amount!".into()),
+    let StoredTx::Deposit {
+      deposit: ref_deposit,
+      dispute: status,
+    } = self.storage.transactions.get_mut(dispute.ref_tx)?
+    else {
+      return Err(EngineError::NotADeposit { tx: dispute.ref_tx });
     };
-    if let Ok(_) = self.storage.disputes.get(&tx.tx) {
-      return Err("Dispute already created/processed!".into());
+    if ref_deposit.client != dispute.client {
+      return Err(EngineError::MismatchedClient {
+        tx: dispute.ref_tx,
+        owner: ref_deposit.client,
+        client: dispute.client,
+      });
     }
-    let account = self.storage.accounts.get_mut(&tx.client)?;
+    if status.is_some() {
+      return Err(EngineError::DisputeAlreadyExists { tx: dispute.ref_tx });
+    }
+    let ref_tx_amount = ref_deposit.amount();
+    let account = self.storage.accounts.get_mut(dispute.client)?;
 
     // Effects
-    account.amount_available -= ref_tx_amount;
-    account.amount_held += ref_tx_amount;
-    self.storage.disputes.add(&ref_tx.tx, Dispute::new());
+    account.hold(ref_tx_amount)?;
+    *status = Some(DisputeStatus::Started);
 
     Ok(())
   }
 
   /// Processes resolve transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Referenced transaction exists.
-  /// 2. Referenced transaction has matching client ID.
-  /// 4. Referenced transaction has amount associated.
-  /// 5. Referenced transaction is under started dispute.
+  /// 2. Referenced transaction is deposit.
+  /// 3. Referenced transaction has matching client ID.
+  /// 4. Referenced transaction is under dispute.
+  /// 5. That dispute is still in the started state.
   /// 6. Client account exists.
+  ///
   /// Effects:
+  ///
   /// 1. Client's available amount is increased.
   /// 2. Client's held amount is decreased.
   /// 3. Dispute is marked as resolved.
-  fn process_resolve(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
+  fn process_resolve(&mut self, resolve: ResolveTx) -> Result<(), EngineError> {
     // Validation
-    let ref_tx = self.storage.transactions.get(&tx.tx)?;
-    if ref_tx.client != tx.client {
-      return Err("Mismatched client id!".into());
-    }
-    let ref_tx_amount = match ref_tx.amount {
-      Some(x) => x,
-      None => return Err("Missing amount!".into()),
+    let StoredTx::Deposit {
+      deposit: ref_deposit,
+      dispute: status,
+    } = self.storage.transactions.get_mut(resolve.ref_tx)?
+    else {
+      return Err(EngineError::NotADeposit { tx: resolve.ref_tx });
     };
-    let dispute = self.storage.disputes.get_mut(&tx.tx)?;
-    if *dispute.get_status() != DisputeStatus::Started {
-      return Err("Dispute has no 'started' state!".into());
+    if ref_deposit.client != resolve.client {
+      return Err(EngineError::MismatchedClient {
+        tx: resolve.ref_tx,
+        owner: ref_deposit.client,
+        client: resolve.client,
+      });
     }
-    let account = self.storage.accounts.get_mut(&tx.client)?;
+    match status {
+      None => return Err(EngineError::DisputeNotFound { tx: resolve.ref_tx }),
+      Some(DisputeStatus::Started) => {}
+      Some(_) => return Err(EngineError::DisputeNotStarted { tx: resolve.ref_tx }),
+    }
+    let ref_tx_amount = ref_deposit.amount();
+    let account = self.storage.accounts.get_mut(resolve.client)?;
 
     // Effects
-    account.amount_available += ref_tx_amount;
-    account.amount_held -= ref_tx_amount;
-    dispute.mark_resolved();
+    account.release(ref_tx_amount)?;
+    *status = Some(DisputeStatus::Resolved);
 
     Ok(())
   }
 
   /// Processes chargeback transaction.
+  ///
   /// Validation rules:
+  ///
   /// 1. Referenced transaction exists.
-  /// 2. Referenced transaction has matching client ID.
-  /// 4. Referenced transaction has amount associated.
-  /// 5. Referenced transaction is under started dispute.
+  /// 2. Referenced transaction is deposit.
+  /// 3. Referenced transaction has matching client ID.
+  /// 4. Referenced transaction is under dispute.
+  /// 5. That dispute is still in the started state.
   /// 6. Client account exists.
+  ///
   /// Effects:
+  ///
   /// 1. Client's held amount is decreased.
   /// 2. Client account is locked.
-  /// 2. Dispute is marked as chargeback-ed.
-  fn process_chargeback(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
+  /// 3. Dispute is marked as charged back.
+  fn process_chargeback(&mut self, chargeback: ChargebackTx) -> Result<(), EngineError> {
     // Validation
-    let ref_tx = self.storage.transactions.get(&tx.tx)?;
-    if ref_tx.client != tx.client {
-      return Err("Mismatched client id!".into());
-    }
-    let ref_tx_amount = match ref_tx.amount {
-      Some(x) => x,
-      None => return Err("Missing amount!".into()),
+    let StoredTx::Deposit {
+      deposit: ref_deposit,
+      dispute: status,
+    } = self.storage.transactions.get_mut(chargeback.ref_tx)?
+    else {
+      return Err(EngineError::NotADeposit {
+        tx: chargeback.ref_tx,
+      });
     };
-    let dispute = self.storage.disputes.get_mut(&tx.tx)?;
-    if *dispute.get_status() != DisputeStatus::Started {
-      return Err("Dispute has no 'started' state!".into());
+    if ref_deposit.client != chargeback.client {
+      return Err(EngineError::MismatchedClient {
+        tx: chargeback.ref_tx,
+        owner: ref_deposit.client,
+        client: chargeback.client,
+      });
     }
-    let account = self.storage.accounts.get_mut(&tx.client)?;
+    match status {
+      None => {
+        return Err(EngineError::DisputeNotFound {
+          tx: chargeback.ref_tx,
+        });
+      }
+      Some(DisputeStatus::Started) => {}
+      Some(_) => {
+        return Err(EngineError::DisputeNotStarted {
+          tx: chargeback.ref_tx,
+        });
+      }
+    }
+    let ref_tx_amount = ref_deposit.amount();
+    let account = self.storage.accounts.get_mut(chargeback.client)?;
 
     // Effects
-    account.amount_held -= ref_tx_amount;
-    account.is_locked = true;
-    dispute.mark_chargeback();
+    account.withdraw_held(ref_tx_amount)?;
+    account.lock();
+    *status = Some(DisputeStatus::ChargedBack);
 
     Ok(())
   }
 
   /// Feeds processor with transaction and updates clients accounts accordingly.
-  /// Creates new client if not already existing, but in case of any
-  /// error during execution, storage will be restored to previous state.
-  pub fn feed_tx(&mut self, tx: Transaction) -> Result<(), Box<dyn Error>> {
-    // Copy client ID, before losing ownership
-    let client_id = tx.client.clone();
-
-    // Insert client into store if not exists
-    let is_new_client = !self.storage.accounts.has(&tx.client);
-    if is_new_client {
-      self.storage.accounts.add(Account::new(tx.client.clone()));
+  pub fn feed_tx(&mut self, tx: Transaction) -> Result<(), EngineError> {
+    match tx {
+      Transaction::Deposit(details) => self.process_deposit(details),
+      Transaction::Withdrawal(details) => self.process_withdrawal(details),
+      Transaction::Dispute(details) => self.process_dispute(details),
+      Transaction::Resolve(details) => self.process_resolve(details),
+      Transaction::Chargeback(details) => self.process_chargeback(details),
     }
-
-    // Process transaction
-    let process_result = match &tx.kind {
-      TransactionType::Deposit => self.process_deposit(tx),
-      TransactionType::Withdrawal => self.process_withdrawal(tx),
-      TransactionType::Dispute => self.process_dispute(tx),
-      TransactionType::Resolve => self.process_resolve(tx),
-      TransactionType::Chargeback => self.process_chargeback(tx),
-    };
-
-    // Revert client insert in case of processing error
-    if let Err(_) = process_result {
-      if is_new_client {
-        self.storage.accounts.remove(&client_id);
-      }
-    }
-
-    process_result
   }
 
-  /// Gets iterator for account map.
-  pub fn get_accounts_iter(&self) -> hash_map::Iter<'_, u16, Account> {
-    self.storage.accounts.raw().iter()
+  /// Gets iterator over the stored accounts.
+  pub fn accounts(&self) -> impl Iterator<Item = &Account> {
+    self.storage.accounts.iter()
   }
 }

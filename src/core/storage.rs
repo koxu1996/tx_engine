@@ -1,134 +1,84 @@
 use std::collections::HashMap;
-use std::error::Error;
 
-use crate::core::types::*;
+use crate::core::error::EngineError;
+use crate::core::types::{Account, ClientId, DepositTx, StoredTx, TransactionId, WithdrawalTx};
 
-/// Common storage for accounts, transactions and their disputes.
+/// Common storage for accounts and transactions.
+#[derive(Default)]
 pub struct Storage {
   pub accounts: AccountsStorage,
   pub transactions: TransactionsStorage,
-  pub disputes: DisputesStorage,
-}
-
-impl Storage {
-  /// Constructs new *Storage*.
-  pub fn new() -> Self {
-    Self {
-      accounts: AccountsStorage::new(),
-      transactions: TransactionsStorage::new(),
-      disputes: DisputesStorage::new(),
-    }
-  }
 }
 
 /// Map holding client Id and corresponding *Account*.
+#[derive(Default)]
 pub struct AccountsStorage(HashMap<ClientId, Account>);
 
 impl AccountsStorage {
-  /// Constructs new *AccountsStorage*.
-  pub fn new() -> Self {
-    Self(HashMap::new())
-  }
-
-  /// Adds client account to storage.
-  /// *Caution:* make sure account id is unique, otherwise
-  /// existing data will be overwritten.
-  pub fn add(&mut self, account: Account) {
-    let id = account.id.clone();
-    self.0.insert(id, account);
-  }
-
-  /// Checks if given client is already stored.
-  pub fn has(&self, id: &ClientId) -> bool {
-    self.0.contains_key(id)
+  /// Gets account from storage, when the client is already known.
+  pub fn get(&self, id: ClientId) -> Option<&Account> {
+    self.0.get(&id)
   }
 
   /// Gets account from storage - mutable version.
-  pub fn get_mut(&mut self, id: &ClientId) -> Result<&mut Account, Box<dyn Error>> {
-    let account = match self.0.get_mut(id) {
-      None => return Err("Account not found".into()),
-      Some(x) => x,
-    };
-    Ok(account)
+  pub fn get_mut(&mut self, id: ClientId) -> Result<&mut Account, EngineError> {
+    self
+      .0
+      .get_mut(&id)
+      .ok_or(EngineError::AccountNotFound { client: id })
   }
 
-  /// Removes account from storage.
-  pub fn remove(&mut self, id: &ClientId) {
-    self.0.remove(id);
+  /// Gets account from storage, or creates an empty one when the client
+  /// is not known yet.
+  pub fn get_or_create(&mut self, id: ClientId) -> &mut Account {
+    self.0.entry(id).or_insert_with(|| Account::new(id))
   }
 
-  /// Gets raw map used by storage.
-  pub fn raw(&self) -> &HashMap<ClientId, Account> {
-    &self.0
+  /// Gets iterator over the stored accounts.
+  pub fn iter(&self) -> impl Iterator<Item = &Account> {
+    self.0.values()
   }
 }
 
-/// Map holding transaction Id and corresponding *Transaction*.
-pub struct TransactionsStorage(HashMap<TransactionId, Transaction>);
+/// Map holding transaction Id and corresponding *StoredTx*.
+#[derive(Default)]
+pub struct TransactionsStorage(HashMap<TransactionId, StoredTx>);
 
 impl TransactionsStorage {
-  /// Constructs new *TransactionsStorage*.
-  pub fn new() -> Self {
-    Self(HashMap::new())
-  }
-
-  /// Adds transaction to storage.
+  /// Adds deposit to storage, under its own transaction ID.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
-  pub fn add(&mut self, transaction: Transaction) {
-    let id = transaction.tx.clone();
-    self.0.insert(id, transaction);
+  pub fn add_deposit(&mut self, deposit: DepositTx) {
+    self.0.insert(
+      deposit.tx,
+      StoredTx::Deposit {
+        deposit,
+        dispute: None,
+      },
+    );
   }
 
-  /// Gets transaction from storage.
-  pub fn get(&self, id: &TransactionId) -> Result<&Transaction, Box<dyn Error>> {
-    let tx = match self.0.get(id) {
-      None => return Err("Transaction not found".into()),
-      Some(x) => x,
-    };
-    Ok(tx)
-  }
-
-  /// Checks if given ID is unique among already existing transactions
-  pub fn assert_unique_id(&self, id: &TransactionId) -> Result<(), Box<dyn Error>> {
-    if let Some(_) = self.0.get(id) {
-      return Err("Transaction ID is not unique".into());
-    };
-    Ok(())
-  }
-}
-
-/// Map holding transaction Id and corresponding *Dispute*.
-pub struct DisputesStorage(HashMap<TransactionId, Dispute>);
-
-impl DisputesStorage {
-  /// Constructs new *DisputesStorage*.
-  pub fn new() -> Self {
-    Self(HashMap::new())
-  }
-
-  /// Adds dispute to storage.
+  /// Adds withdrawal to storage, under its own transaction ID.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
-  pub fn add(&mut self, id: &TransactionId, dispute: Dispute) {
-    self.0.insert(id.clone(), dispute);
+  pub fn add_withdrawal(&mut self, withdrawal: WithdrawalTx) {
+    self
+      .0
+      .insert(withdrawal.tx, StoredTx::Withdrawal(withdrawal));
   }
 
-  /// Gets dispute from storage.
-  pub fn get(&self, id: &TransactionId) -> Result<&Dispute, Box<dyn Error>> {
-    let dispute = match self.0.get(id) {
-      None => return Err("Dispute not found".into()),
-      Some(x) => x,
-    };
-    Ok(dispute)
+  /// Gets stored transaction from storage - mutable version.
+  /// The dispute state lives on the stored deposit, so a caller that
+  /// changes it needs this handle.
+  pub fn get_mut(&mut self, id: TransactionId) -> Result<&mut StoredTx, EngineError> {
+    self
+      .0
+      .get_mut(&id)
+      .ok_or(EngineError::TransactionNotFound { tx: id })
   }
 
-  /// Gets transaction from storage - mutable version.
-  pub fn get_mut(&mut self, id: &TransactionId) -> Result<&mut Dispute, Box<dyn Error>> {
-    let dispute = match self.0.get_mut(id) {
-      None => return Err("Dispute not found".into()),
-      Some(x) => x,
-    };
-    Ok(dispute)
+  /// Checks if a transaction with given ID is already stored.
+  pub fn has(&self, id: TransactionId) -> bool {
+    self.0.contains_key(&id)
   }
 }

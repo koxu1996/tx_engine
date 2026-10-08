@@ -1,12 +1,21 @@
 [package]
 name = "tx_engine"
-version = "1.0.0"
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+version = "2.0.0"
+edition = "2024"
 
 [dependencies]
-rust_decimal = "1.16"
-csv = "1.1"
-serde = { version = "1.0", features = ["derive"] }
-structopt = "0.3"
+
+# Fixed-point decimal numbers, to avoid the round-off errors on the amounts.
+rust_decimal = { version = "1.43.0", default-features = false, features = ["serde", "serde-with-str"] }
+
+# Reader and writer for the CSV format.
+csv = { version = "1.4.0", default-features = false, features = [] }
+
+# Serialization framework, for the CSV rows.
+serde = { version = "1.0.229", default-features = false, features = ["derive"] }
+
+# Parser for the command line arguments.
+clap = { version = "4.6.7", default-features = false, features = ["derive", "std", "help", "usage", "error-context", "color"] }
+
+# Derive macro for the error types.
+thiserror = { version = "2.0.21", default-features = false, features = [] }
