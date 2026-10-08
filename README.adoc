@@ -2,6 +2,12 @@
 
 A toy payments engine. It reads transactions from a CSV, keeps a balance per client, applies disputes and chargebacks, and prints the final state of every account as CSV.
 
+== Update after 5 years / AI usage
+
+The original implementation (2021) was written without any AI assistance. Five years later I came back to it and reworked it, and the commits from 2026 are that rework.
+
+The rework was done with an AI coding agent (Claude Code) in an interactive session. I drove it: I chose the designs, pushed back on the proposals I disagreed with, and reverted several changes that did not earn their keep. The agent read the code, ran the benchmarks and the sample inputs, and wrote the commit messages from the staged diff, as one-liners in Simplified Technical English. Every decision in this repository is mine, and I am happy to walk through any of them.
+
 == Running it
 
 ----
