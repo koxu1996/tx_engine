@@ -1,45 +1,51 @@
 = tx_engine (Rust Coding Test)
 
-Simple toy payments engine that reads a series of transactions from a CSV, updates client accounts, handles disputes and chargebacks, and then outputs the state of clients accounts as a CSV.
+A toy payments engine. It reads transactions from a CSV, keeps a balance per client, applies disputes and chargebacks, and prints the final state of every account as CSV.
 
-== Goals
+== Running it
 
-My primary goal was to focus on *completness* and *correctness*. Therefore I tested tricky cases like:
+----
+cargo run -- transactions.csv > accounts.csv
+cargo test
+----
 
-- double chargeback of the same transaction
-- dispute of transactions different than deposit
-- malicious data, e.g. wrong client/amount passed in dispute
-- deposit/chargeback after locking account
+The summary goes to stdout and every rejected row goes to stderr, so redirecting stdout gives a clean CSV. The _./assets_ directory holds the sample inputs, each paired with the output it has to produce, and `cargo test` runs all of them through the engine and compares.
 
-Some of the tests are placed under _./assets_ directory in this repository.
+== How a dispute works
 
-== My assumptions
-
-Task is not clear about what happens when account is locked and what transaction should be accepted since that event. We also do not know if only deposit can be disputed, or maybe withdrawal too?. Should we allow dispute if user has not enough money? A lot of things is unclear...
-
-I know that task states:
+I read the engine as an exchange that takes card payments: a deposit is a payment in, a withdrawal is a payout out. A dispute is then not something the client raises. It is the card issuer pulling a deposit back, after a stolen card for example. The task asks for exactly that kind of reading:
 ____
 When in doubt on how to interpret a requirement, try to make assumptions that make sense for a bank.
 ____
 
-However it is *not fair* and contradicts with:
-____
-If our automatic test suite passes, manual scoring will beused for everything else.
-____
+That one picture settles the rules the task leaves open. Only a deposit can be disputed, because a withdrawal was requested and authenticated by the client and no third party can reverse it. A dispute row carries no amount, because the issuer points at the original transaction instead of restating the sum. A chargeback locks the account, because the deposit was probably fraudulent, and nothing unlocks it, because that call belongs to a human.
 
-But I decided to make following assumptions:
+A dispute on its own locks nothing. It moves the disputed amount from available to held and leaves the rest of the balance usable while the issuer decides. A balance can end up negative when the funds left before the chargeback arrived, which is the loss the exchange takes. _./assets/test_010.csv_ records that case.
 
-- Malformed data is not improved/corrected, but simply rejected. *Example:* dispute/resolve/chargeback transaction with wrong client ID, or containing amount field
-- After account is locked we disallow deposit and withdrawal, but we still allow to make dispute or process resolve/chargeback.
-- We allow to make dispute even if user has not enough money available. As a results you will observe negative balances.
+== Decisions
 
-== Safety
+- A malformed row is rejected, never repaired. *Example:* a dispute with the wrong client ID, or with an amount field.
+- A locked account takes no deposit and no withdrawal, but a dispute, a resolve and a chargeback still go through.
+- A dispute is allowed even when the client has nothing available, so balances can go negative.
+- Amounts print with the scale the arithmetic produced them in, with no padding and no rounding. *Example:* `held` shows `0` for an account that was never disputed, and `0.0` once a dispute moved an amount with one decimal place.
+- The summary is sorted by client ID, so two runs over the same input give identical bytes. A library caller that needs no order can ask for `SummaryOrder::Unsorted` and skip the sort.
 
-I did *not* use unsafe code and panic should not happen at all. Other errors are handled in following way:
+== Errors
 
-- general args / file/stdout errors - message is printed and program exits with code 1,
-- data errors, e.g. malformed row - invalid rows are skipped, message is printed to stderr.
+There is no `unsafe` code, and no `unwrap`, `expect` or `panic!` outside the benchmarks.
 
-== Non-goals
+- Bad arguments: usage on stderr, exit code 2, the same as `ls`, `grep` or `sort`.
+- A file that cannot be read, or output that cannot be written: message on stderr, exit code 1.
+- A row the engine refuses: message on stderr, the row is skipped, and the number of skipped rows is printed at the end. The run still succeeds, because one bad row says nothing about the rest of the file.
 
-Given time - few hours - is enough to create good prototype, but it is too little to focus on other aspects like unit-testing, optimizations. Especially because of some unclear parts of tasks (see *My assumptions*) it is hard to figure out "correct" behavior.
+== Design notes
+
+Every handler reads first and writes second, with a comment marking the two halves, so a rejected transaction leaves the storage exactly as it was and the engine needs no rollback. Among the writes either none can fail or only the first one can, so a failure never stops halfway. `Account::hold` and `Account::release` compute both amounts before they assign either. A deposit is the one exception: it may create the account it pays into before it adds to it, which is safe because a new account starts at zero.
+
+Every amount uses checked arithmetic, so an overflow is an error and not a panic. A deposit checks the total as well as the available amount. Without that check a deposit could fill available while a dispute held the same sum, and the account would be stuck: its summary would not print, and its dispute could only be charged back, never resolved.
+
+The state of a dispute lives on the stored deposit it refers to, not in a map of its own. A dispute without a transaction, and a dispute of a withdrawal, therefore have no representation.
+
+== What is not here
+
+A few hours is enough for a careful prototype, not for everything. The vectors in _./assets_ cover the engine from input to output, but there is no unit test per function and no performance work beyond the benchmarks. Several parts of the task are open to interpretation, and *How a dispute works* explains the reading I settled on.
