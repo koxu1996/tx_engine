@@ -100,7 +100,7 @@ pub struct AccountRow {
 }
 
 impl AccountRow {
-  /// Creates CSV row from existing *Account*. No error is expected here.
+  /// Creates CSV row from existing *Account*.
   pub fn new(account: &Account) -> Result<Self, EngineError> {
     Ok(Self {
       client: account.id(),
