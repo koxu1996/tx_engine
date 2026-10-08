@@ -28,10 +28,14 @@ pub enum CsvError {
   #[error(transparent)]
   Engine(#[from] EngineError),
 
+  /// The reader itself failed, so no further row can arrive.
+  #[error("cannot read the CSV data: {0}")]
+  ReadFailed(#[from] csv::Error),
+
   /// A row of the summary cannot be written.
   /// Broken output pipe could trigger this.
   #[error("cannot write the account row: {0}")]
-  RowWriteFailed(#[from] csv::Error),
+  RowWriteFailed(csv::Error),
 
   /// The summary cannot be written to the standard output.
   #[error("cannot write the summary: {source}")]

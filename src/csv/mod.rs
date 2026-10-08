@@ -47,13 +47,15 @@ impl CsvProvider {
     })?;
 
     // Delegate parsing to generic *load* method.
-    Ok(self.load(file))
+    self.load(file)
   }
 
   /// Loads transactions from reader into internal *processor*, and reports
   /// how many rows it accepted and skipped.
   /// An invalid row never stops the load; it is logged to stderr instead.
-  pub fn load(&mut self, reader: impl Read) -> LoadReport {
+  /// A failure of the reader itself does stop it, because no further row
+  /// can arrive.
+  pub fn load(&mut self, reader: impl Read) -> Result<LoadReport, CsvError> {
     // Read CSV data with buffered reader.
     // We use following config:
     // - first row is header,
@@ -65,14 +67,22 @@ impl CsvProvider {
       .trim(csv::Trim::All)
       .from_reader(reader);
 
+    // Read the header here - we can catch invalid file or broken reader early.
+    rdr.headers()?;
+
     // For every line in CSV perform deserialization into *Transaction*, via *TransactionRow*.
     // **Note:** We pass transaction ownership to *processor*.
     let mut report = LoadReport::default();
     for result in rdr.deserialize::<CsvTransaction>() {
-      // Skip invalid rows.
-      let Ok(tx) = result.inspect_err(|e| eprintln!("Skipping invalid row: {e}")) else {
-        report.skipped += 1;
-        continue;
+      // Skip invalid rows, but stop when the reader itself failed.
+      let tx = match result {
+        Ok(tx) => tx,
+        Err(e) if matches!(e.kind(), csv::ErrorKind::Io(_)) => return Err(e.into()),
+        Err(e) => {
+          eprintln!("Skipping invalid row: {e}");
+          report.skipped += 1;
+          continue;
+        }
       };
 
       // Feed processor with tx.
@@ -85,7 +95,7 @@ impl CsvProvider {
       }
     }
 
-    report
+    Ok(report)
   }
 
   /// Writes summary of each account in CSV format into given *writer*.
@@ -128,7 +138,7 @@ impl CsvProvider {
   /// A failure stops the summary, because it means the sink is gone.
   fn write_account<W: Write>(wtr: &mut csv::Writer<W>, account: &Account) -> Result<(), CsvError> {
     let acc_row = AccountRow::new(account)?;
-    wtr.serialize(acc_row)?;
+    wtr.serialize(acc_row).map_err(CsvError::RowWriteFailed)?;
 
     Ok(())
   }
