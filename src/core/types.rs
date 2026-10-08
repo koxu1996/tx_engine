@@ -69,10 +69,17 @@ impl Account {
   /// Increases available amount, as a result of deposit.
   /// Returns error when the result does not fit in **Decimal**.
   pub fn deposit(&mut self, amount: TxAmount) -> Result<(), EngineError> {
-    self.amount_available = self
+    let available = self
       .amount_available
       .checked_add(amount.get())
       .ok_or(EngineError::AvailableOverflowed { client: self.id })?;
+
+    // Extra check: total must stay inside a **Decimal** as well.
+    available
+      .checked_add(self.amount_held)
+      .ok_or(EngineError::TotalOverflowed { client: self.id })?;
+
+    self.amount_available = available;
 
     Ok(())
   }
