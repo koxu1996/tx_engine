@@ -138,7 +138,7 @@ impl Account {
 }
 
 /// Dispute status
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisputeStatus {
   Started,
   Resolved,
@@ -245,6 +245,20 @@ pub struct ChargebackTx {
   pub ref_tx: TransactionId,
 }
 
+/// A transaction that the engine stored, together with the state of its
+/// dispute.
+///
+/// Only these two kinds are ever stored, and only a deposit can be
+/// disputed, so a dispute of a withdrawal has no representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoredTx {
+  Deposit {
+    deposit: DepositTx,
+    dispute: Option<DisputeStatus>,
+  },
+  Withdrawal(WithdrawalTx),
+}
+
 /// Transaction - deposit / withdrawal / dispute, etc.
 ///
 /// Each kind carries its own details. Only the kinds that move money
@@ -257,19 +271,6 @@ pub enum Transaction {
   Dispute(DisputeTx),
   Resolve(ResolveTx),
   Chargeback(ChargebackTx),
-}
-
-impl Transaction {
-  /// Client ID of this transaction.
-  pub fn client(&self) -> ClientId {
-    match self {
-      Self::Deposit(details) => details.client,
-      Self::Withdrawal(details) => details.client,
-      Self::Dispute(details) => details.client,
-      Self::Resolve(details) => details.client,
-      Self::Chargeback(details) => details.client,
-    }
-  }
 }
 
 #[cfg(test)]

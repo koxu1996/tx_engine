@@ -1,10 +1,12 @@
 use crate::core::error::EngineError;
 use crate::core::storage::Storage;
 use crate::core::types::{
-  Account, ChargebackTx, DepositTx, DisputeStatus, DisputeTx, ResolveTx, Transaction, WithdrawalTx,
+  Account, ChargebackTx, DepositTx, DisputeStatus, DisputeTx, ResolveTx, StoredTx, Transaction,
+  WithdrawalTx,
 };
 
-/// Balance processor, with internal storage for accounts/transactions/disputes.
+/// Balance processor, with internal storage for accounts and transactions.
+/// The state of a dispute lives on the stored deposit that it refers to.
 #[derive(Default)]
 pub struct BalanceProcessor {
   storage: Storage,
@@ -91,8 +93,8 @@ impl BalanceProcessor {
   /// Validation rules:
   ///
   /// 1. Referenced transaction exists.
-  /// 2. Referenced transaction has matching client ID.
-  /// 3. Referenced transaction is deposit.
+  /// 2. Referenced transaction is deposit.
+  /// 3. Referenced transaction has matching client ID.
   /// 4. Referenced transaction is not already disputed.
   /// 5. Client account exists.
   ///
@@ -100,30 +102,32 @@ impl BalanceProcessor {
   ///
   /// 1. Client's available amount is decreased.
   /// 2. Client's held amount is increased.
-  /// 3. Dispute is stored.
+  /// 3. Dispute is started on the stored deposit.
   fn process_dispute(&mut self, dispute: DisputeTx) -> Result<(), EngineError> {
     // Validation
-    let ref_tx = self.storage.transactions.get(dispute.ref_tx)?;
-    if ref_tx.client() != dispute.client {
+    let StoredTx::Deposit {
+      deposit: ref_deposit,
+      dispute: status,
+    } = self.storage.transactions.get_mut(dispute.ref_tx)?
+    else {
+      return Err(EngineError::NotADeposit { tx: dispute.ref_tx });
+    };
+    if ref_deposit.client != dispute.client {
       return Err(EngineError::MismatchedClient {
         tx: dispute.ref_tx,
-        owner: ref_tx.client(),
+        owner: ref_deposit.client,
         client: dispute.client,
       });
     }
-    // A dispute refers to a deposit, and takes the deposited amount
-    let Transaction::Deposit(ref_deposit) = ref_tx else {
-      return Err(EngineError::NotADeposit { tx: dispute.ref_tx });
-    };
-    let ref_tx_amount = ref_deposit.amount();
-    if self.storage.disputes.has(dispute.ref_tx) {
+    if status.is_some() {
       return Err(EngineError::DisputeAlreadyExists { tx: dispute.ref_tx });
     }
+    let ref_tx_amount = ref_deposit.amount();
     let account = self.storage.accounts.get_mut(dispute.client)?;
 
     // Effects
     account.hold(ref_tx_amount)?;
-    self.storage.disputes.open(dispute.ref_tx);
+    *status = Some(DisputeStatus::Started);
 
     Ok(())
   }
@@ -133,10 +137,11 @@ impl BalanceProcessor {
   /// Validation rules:
   ///
   /// 1. Referenced transaction exists.
-  /// 2. Referenced transaction has matching client ID.
-  /// 3. Referenced transaction is deposit.
-  /// 4. Referenced transaction is under started dispute.
-  /// 5. Client account exists.
+  /// 2. Referenced transaction is deposit.
+  /// 3. Referenced transaction has matching client ID.
+  /// 4. Referenced transaction is under dispute.
+  /// 5. That dispute is still in the started state.
+  /// 6. Client account exists.
   ///
   /// Effects:
   ///
@@ -145,28 +150,31 @@ impl BalanceProcessor {
   /// 3. Dispute is marked as resolved.
   fn process_resolve(&mut self, resolve: ResolveTx) -> Result<(), EngineError> {
     // Validation
-    let ref_tx = self.storage.transactions.get(resolve.ref_tx)?;
-    if ref_tx.client() != resolve.client {
+    let StoredTx::Deposit {
+      deposit: ref_deposit,
+      dispute: status,
+    } = self.storage.transactions.get_mut(resolve.ref_tx)?
+    else {
+      return Err(EngineError::NotADeposit { tx: resolve.ref_tx });
+    };
+    if ref_deposit.client != resolve.client {
       return Err(EngineError::MismatchedClient {
         tx: resolve.ref_tx,
-        owner: ref_tx.client(),
+        owner: ref_deposit.client,
         client: resolve.client,
       });
     }
-    // A resolve refers to a disputed deposit, and takes the deposited amount
-    let Transaction::Deposit(ref_deposit) = ref_tx else {
-      return Err(EngineError::NotADeposit { tx: resolve.ref_tx });
-    };
-    let ref_tx_amount = ref_deposit.amount();
-    let dispute = self.storage.disputes.get_mut(resolve.ref_tx)?;
-    if *dispute != DisputeStatus::Started {
-      return Err(EngineError::DisputeNotStarted { tx: resolve.ref_tx });
+    match status {
+      None => return Err(EngineError::DisputeNotFound { tx: resolve.ref_tx }),
+      Some(DisputeStatus::Started) => {}
+      Some(_) => return Err(EngineError::DisputeNotStarted { tx: resolve.ref_tx }),
     }
+    let ref_tx_amount = ref_deposit.amount();
     let account = self.storage.accounts.get_mut(resolve.client)?;
 
     // Effects
     account.release(ref_tx_amount)?;
-    *dispute = DisputeStatus::Resolved;
+    *status = Some(DisputeStatus::Resolved);
 
     Ok(())
   }
@@ -176,10 +184,11 @@ impl BalanceProcessor {
   /// Validation rules:
   ///
   /// 1. Referenced transaction exists.
-  /// 2. Referenced transaction has matching client ID.
-  /// 3. Referenced transaction is deposit.
-  /// 4. Referenced transaction is under started dispute.
-  /// 5. Client account exists.
+  /// 2. Referenced transaction is deposit.
+  /// 3. Referenced transaction has matching client ID.
+  /// 4. Referenced transaction is under dispute.
+  /// 5. That dispute is still in the started state.
+  /// 6. Client account exists.
   ///
   /// Effects:
   ///
@@ -188,33 +197,42 @@ impl BalanceProcessor {
   /// 3. Dispute is marked as charged back.
   fn process_chargeback(&mut self, chargeback: ChargebackTx) -> Result<(), EngineError> {
     // Validation
-    let ref_tx = self.storage.transactions.get(chargeback.ref_tx)?;
-    if ref_tx.client() != chargeback.client {
-      return Err(EngineError::MismatchedClient {
-        tx: chargeback.ref_tx,
-        owner: ref_tx.client(),
-        client: chargeback.client,
-      });
-    }
-    // A chargeback refers to a disputed deposit, and takes the deposited amount
-    let Transaction::Deposit(ref_deposit) = ref_tx else {
+    let StoredTx::Deposit {
+      deposit: ref_deposit,
+      dispute: status,
+    } = self.storage.transactions.get_mut(chargeback.ref_tx)?
+    else {
       return Err(EngineError::NotADeposit {
         tx: chargeback.ref_tx,
       });
     };
-    let ref_tx_amount = ref_deposit.amount();
-    let dispute = self.storage.disputes.get_mut(chargeback.ref_tx)?;
-    if *dispute != DisputeStatus::Started {
-      return Err(EngineError::DisputeNotStarted {
+    if ref_deposit.client != chargeback.client {
+      return Err(EngineError::MismatchedClient {
         tx: chargeback.ref_tx,
+        owner: ref_deposit.client,
+        client: chargeback.client,
       });
     }
+    match status {
+      None => {
+        return Err(EngineError::DisputeNotFound {
+          tx: chargeback.ref_tx,
+        });
+      }
+      Some(DisputeStatus::Started) => {}
+      Some(_) => {
+        return Err(EngineError::DisputeNotStarted {
+          tx: chargeback.ref_tx,
+        });
+      }
+    }
+    let ref_tx_amount = ref_deposit.amount();
     let account = self.storage.accounts.get_mut(chargeback.client)?;
 
     // Effects
     account.withdraw_held(ref_tx_amount)?;
     account.lock();
-    *dispute = DisputeStatus::ChargedBack;
+    *status = Some(DisputeStatus::ChargedBack);
 
     Ok(())
   }

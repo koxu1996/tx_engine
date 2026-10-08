@@ -1,16 +1,13 @@
 use std::collections::HashMap;
 
 use crate::core::error::EngineError;
-use crate::core::types::{
-  Account, ClientId, DepositTx, DisputeStatus, Transaction, TransactionId, WithdrawalTx,
-};
+use crate::core::types::{Account, ClientId, DepositTx, StoredTx, TransactionId, WithdrawalTx};
 
-/// Common storage for accounts, transactions and their disputes.
+/// Common storage for accounts and transactions.
 #[derive(Default)]
 pub struct Storage {
   pub accounts: AccountsStorage,
   pub transactions: TransactionsStorage,
-  pub disputes: DisputesStorage,
 }
 
 /// Map holding client Id and corresponding *Account*.
@@ -43,16 +40,22 @@ impl AccountsStorage {
   }
 }
 
-/// Map holding transaction Id and corresponding *Transaction*.
+/// Map holding transaction Id and corresponding *StoredTx*.
 #[derive(Default)]
-pub struct TransactionsStorage(HashMap<TransactionId, Transaction>);
+pub struct TransactionsStorage(HashMap<TransactionId, StoredTx>);
 
 impl TransactionsStorage {
   /// Adds deposit to storage, under its own transaction ID.
   /// *Caution:* make sure transaction id is unique, otherwise
   /// existing data will be overwritten.
   pub fn add_deposit(&mut self, deposit: DepositTx) {
-    self.0.insert(deposit.tx, Transaction::Deposit(deposit));
+    self.0.insert(
+      deposit.tx,
+      StoredTx::Deposit {
+        deposit,
+        dispute: None,
+      },
+    );
   }
 
   /// Adds withdrawal to storage, under its own transaction ID.
@@ -61,45 +64,21 @@ impl TransactionsStorage {
   pub fn add_withdrawal(&mut self, withdrawal: WithdrawalTx) {
     self
       .0
-      .insert(withdrawal.tx, Transaction::Withdrawal(withdrawal));
+      .insert(withdrawal.tx, StoredTx::Withdrawal(withdrawal));
   }
 
-  /// Gets transaction from storage.
-  pub fn get(&self, id: TransactionId) -> Result<&Transaction, EngineError> {
+  /// Gets stored transaction from storage - mutable version.
+  /// The dispute state lives on the stored deposit, so a caller that
+  /// changes it needs this handle.
+  pub fn get_mut(&mut self, id: TransactionId) -> Result<&mut StoredTx, EngineError> {
     self
       .0
-      .get(&id)
+      .get_mut(&id)
       .ok_or(EngineError::TransactionNotFound { tx: id })
   }
 
   /// Checks if a transaction with given ID is already stored.
   pub fn has(&self, id: TransactionId) -> bool {
     self.0.contains_key(&id)
-  }
-}
-
-/// Map holding transaction Id and corresponding *DisputeStatus*.
-#[derive(Default)]
-pub struct DisputesStorage(HashMap<TransactionId, DisputeStatus>);
-
-impl DisputesStorage {
-  /// Opens new dispute for given transaction.
-  /// *Caution:* make sure transaction id is unique, otherwise
-  /// existing data will be overwritten.
-  pub fn open(&mut self, id: TransactionId) {
-    self.0.insert(id, DisputeStatus::Started);
-  }
-
-  /// Checks if dispute for given transaction is already stored.
-  pub fn has(&self, id: TransactionId) -> bool {
-    self.0.contains_key(&id)
-  }
-
-  /// Gets dispute from storage - mutable version.
-  pub fn get_mut(&mut self, id: TransactionId) -> Result<&mut DisputeStatus, EngineError> {
-    self
-      .0
-      .get_mut(&id)
-      .ok_or(EngineError::DisputeNotFound { tx: id })
   }
 }
